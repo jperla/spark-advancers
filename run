@@ -62,6 +62,7 @@ CLASSPATH+=:$BAGEL_DIR/target/scala-$SCALA_VERSION/classes
 export CLASSPATH # Needed for spark-shell
 
 if [ -n "$SCALA_HOME" ]; then
+  echo "bin/scala/"
   SCALA=${SCALA_HOME}/bin/scala
 else
   SCALA=scala
