@@ -10,6 +10,7 @@ import com.google.protobuf.ByteString
 import org.apache.mesos._
 import org.apache.mesos.Protos._
 
+import java.io._
 
 /**
  * A Job that runs a set of tasks with no interdependencies.
@@ -37,6 +38,7 @@ extends Job(jobId) with Logging
 
   var tasksLaunched = 0
   var tasksFinished = 0
+  var d = new DoubleWeakSharable(0.0)
 
   // Last time when we launched a preferred task (for delay scheduling)
   var lastPreferredLaunchTime = System.currentTimeMillis
@@ -176,6 +178,8 @@ extends Job(jobId) with Logging
   }
 
   def statusUpdate(status: TaskStatus) {
+   //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received some TASK")}) 
+    logInfo("Received a message")
     status.getState match {
       case TaskState.TASK_FINISHED =>
         taskFinished(status)
@@ -185,12 +189,40 @@ extends Job(jobId) with Logging
         taskLost(status)
       case TaskState.TASK_KILLED =>
         taskLost(status)
+        
+        //Using one of the free states in Mesos. Will add our own later
+      case TaskState.TASK_RUNNING =>
+        taskUpdateShared(status)
       case _ =>
     }
   }
 
-  def taskFinished(status: TaskStatus) {
+  def printToFile(f: java.io.File)(op: java.io.PrintWriter => Unit) {
+    val p = new java.io.PrintWriter(f)
+    try { op(p) } finally { p.close() }
+  }
+
+
+  def taskUpdateShared(status: TaskStatus) {
     val tid = status.getTaskId.getValue
+    val index = tidToIndex(tid)
+
+    //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received TASK_RUNNING")})
+    logInfo("received a TASK_RUNNING message from "+tid)
+    if(!status.getData.isEmpty()){
+        val result = Utils.deserialize[Map[Long, Any]](status.getData.toByteArray)
+
+        val hardcoded_id = 0
+        d.asInstanceOf[Accumulator[Any]] += result(hardcoded_id)
+        //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received TASK_RUNNING")})
+        logInfo("Received weak at master from "+tid+" "+d.value) 
+    }
+  }
+
+  def taskFinished(status: TaskStatus) {
+    //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received TASK_FINISHED")})
+    val tid = status.getTaskId.getValue
+    logInfo("received a TASK_FINISHED from "+tid)
     val index = tidToIndex(tid)
     if (!finished(index)) {
       tasksFinished += 1

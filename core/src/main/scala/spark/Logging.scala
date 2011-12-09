@@ -26,7 +26,8 @@ trait Logging {
   }
 
   // Log methods that take only a String
-  def logInfo(msg: => String) = if (log.isInfoEnabled) log.info(msg)
+  def logInfo(msg: => String) = log.info(msg)
+  //def logInfo(msg: => String) = if (log.isInfoEnabled) log.info(msg)
 
   def logDebug(msg: => String) = if (log.isDebugEnabled) log.debug(msg)
 

@@ -22,6 +22,12 @@ class Executor extends org.apache.mesos.Executor with Logging {
   var threadPool: ExecutorService = null
   var env: SparkEnv = null
 
+  /*Shitty global stuff so that Accumulator can call sendWeakShared()
+  */
+  var savedExecutorDriver: ExecutorDriver = null
+  var savedTaskDescription: TaskDescription = null
+  var thisExecutor = this
+
   initLogging()
 
   override def init(d: ExecutorDriver, args: ExecutorArgs) {
@@ -52,6 +58,17 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
+  def sendWeakShared()
+  {
+    var updates = scala.collection.mutable.Map[Long, Any]()
+    updates(0) = Accumulators.values(1)
+    savedExecutorDriver.sendStatusUpdate(TaskStatus.newBuilder()
+                           .setTaskId(savedTaskDescription.getTaskId)
+                           .setState(TaskState.TASK_RUNNING)
+                           .setData(ByteString.copyFrom(Utils.serialize(updates)))
+                           .build())
+  }
+
   class TaskRunner(desc: TaskDescription, d: ExecutorDriver)
   extends Runnable {
     override def run() = {
@@ -65,6 +82,15 @@ class Executor extends org.apache.mesos.Executor with Logging {
         SparkEnv.set(env)
         Thread.currentThread.setContextClassLoader(classLoader)
         Accumulators.clear
+        /*
+        Setting the accumulators executor to this object. Accumulator will call
+        sendStatusUpdate()
+        */
+        Accumulators.setExecutor(thisExecutor)
+        savedExecutorDriver = d
+        savedTaskDescription = desc
+        
+
         val task = Utils.deserialize[Task[Any]](desc.getData.toByteArray, classLoader)
         for (gen <- task.generation) // Update generation if any is set
           env.mapOutputTracker.updateGeneration(gen)
