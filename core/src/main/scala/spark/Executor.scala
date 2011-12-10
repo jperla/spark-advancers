@@ -58,10 +58,11 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
-  def sendWeakShared()
+  def sendWeakShared[T](w: WeakSharable[T])
   {
     var updates = scala.collection.mutable.Map[Long, Any]()
-    updates(0) = Accumulators.values(1)
+    val hardcoded_id = 0
+    updates(hardcoded_id) = w
     savedExecutorDriver.sendStatusUpdate(TaskStatus.newBuilder()
                            .setTaskId(savedTaskDescription.getTaskId)
                            .setState(TaskState.TASK_RUNNING)
@@ -84,7 +85,7 @@ class Executor extends org.apache.mesos.Executor with Logging {
         Accumulators.clear
         /*
         Setting the accumulators executor to this object. Accumulator will call
-        sendStatusUpdate()
+        sendWeakShared()
         */
         Accumulators.setExecutor(thisExecutor)
         savedExecutorDriver = d

@@ -178,8 +178,6 @@ extends Job(jobId) with Logging
   }
 
   def statusUpdate(status: TaskStatus) {
-   //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received some TASK")}) 
-    logInfo("Received a message")
     status.getState match {
       case TaskState.TASK_FINISHED =>
         taskFinished(status)
@@ -207,20 +205,18 @@ extends Job(jobId) with Logging
     val tid = status.getTaskId.getValue
     val index = tidToIndex(tid)
 
-    //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received TASK_RUNNING")})
-    logInfo("received a TASK_RUNNING message from "+tid)
     if(!status.getData.isEmpty()){
-        val result = Utils.deserialize[Map[Long, Any]](status.getData.toByteArray)
+        val result = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
 
         val hardcoded_id = 0
-        d.asInstanceOf[Accumulator[Any]] += result(hardcoded_id)
-        //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received TASK_RUNNING")})
-        logInfo("Received weak at master from "+tid+" "+d.value) 
+        var newWeak = result(hardcoded_id).asInstanceOf[WeakSharable[Double]]
+        d.monotonicUpdate(newWeak)
+
+        logInfo("Received weak at master from "+index+" "+d.value+","+newWeak.value) 
     }
   }
 
   def taskFinished(status: TaskStatus) {
-    //printToFile(new File("/home/princeton_ram/spark/log.txt"))(p => { p.println("Received TASK_FINISHED")})
     val tid = status.getTaskId.getValue
     logInfo("received a TASK_FINISHED from "+tid)
     val index = tidToIndex(tid)

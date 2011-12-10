@@ -318,13 +318,6 @@ object SparkContext {
     def zero(initialValue: Int) = 0
   }
   
-  /* Class implementing add and zero for WeakSharable accumulator behavior*/
-  class WeakSharableAccumulatorParam[T] extends AccumulatorParam[WeakSharable[T]] {
-    def addInPlace(t1: WeakSharable[T], t2: WeakSharable[T]): WeakSharable[T] = t1.monotonicUpdate(t2)
-    def zero(initialValue: WeakSharable[T]): WeakSharable[T] = initialValue.construct()   
-}
-  
-  
 
   // TODO: Add AccumulatorParams for other types, e.g. lists and strings
 

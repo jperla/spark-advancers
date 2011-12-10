@@ -17,7 +17,6 @@ class Accumulator[T] (
 
   def += (term: T) { 
     value_ = param.addInPlace(value_, term) 
-    updateWeakShared()
   }
   def value = this.value_
   def value_= (t: T) {
@@ -25,8 +24,7 @@ class Accumulator[T] (
     else throw new UnsupportedOperationException("Can't use value_= in task")
   }
   
-  def updateWeakShared() { Accumulators.executor.sendWeakShared()}
-  
+
   // Called by Java when deserializing an object
   private def readObject(in: ObjectInputStream) {
     in.defaultReadObject
@@ -51,12 +49,16 @@ private object Accumulators
   val originals = Map[Long, Accumulator[_]]()
   val localAccums = Map[Thread, Map[Long, Accumulator[_]]]()
   var lastId: Long = 0
+  
+  /*Callback into Executor*/
   var executor: Executor = null
 
   def newId: Long = synchronized { lastId += 1; return lastId }
     
   def setExecutor(e : Executor) { executor = e }
-  
+ 
+  def sendWeakShared[T](w: WeakSharable[T]) { executor.sendWeakShared(w)}
+
   def register(a: Accumulator[_], original: Boolean): Unit = synchronized {
     if (original) {
       originals(a.id) = a
