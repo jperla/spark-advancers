@@ -22,11 +22,10 @@ class Executor extends org.apache.mesos.Executor with Logging {
   var threadPool: ExecutorService = null
   var env: SparkEnv = null
 
-  /*Shitty global stuff so that Accumulator can call sendWeakShared()
-  */
-  var savedExecutorDriver: ExecutorDriver = null
-  var savedTaskDescription: TaskDescription = null
-  var thisExecutor = this
+  var thisExecutor = this 
+  val f = new File("/home/princeton_ram/spark/logrecv.txt")
+  println("Creating ws")
+  WeakShared.ws = new DoubleWeakSharable(0.0) 
 
   initLogging()
 
@@ -58,16 +57,16 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
-  def sendWeakShared[T](w: WeakSharable[T])
+  def sendWeakShared[T](w: WeakSharable[T], d: ExecutorDriver, t: TaskDescription) 
   {
     var updates = scala.collection.mutable.Map[Long, Any]()
     val hardcoded_id = 0
     updates(hardcoded_id) = w
-    savedExecutorDriver.sendStatusUpdate(TaskStatus.newBuilder()
-                           .setTaskId(savedTaskDescription.getTaskId)
-                           .setState(TaskState.TASK_RUNNING)
-                           .setData(ByteString.copyFrom(Utils.serialize(updates)))
-                           .build())
+    d.sendStatusUpdate(TaskStatus.newBuilder()
+                        .setTaskId(t.getTaskId)
+                        .setState(TaskState.TASK_RUNNING)
+                        .setData(ByteString.copyFrom(Utils.serialize(updates)))
+                        .build())
   }
 
   class TaskRunner(desc: TaskDescription, d: ExecutorDriver)
@@ -83,14 +82,12 @@ class Executor extends org.apache.mesos.Executor with Logging {
         SparkEnv.set(env)
         Thread.currentThread.setContextClassLoader(classLoader)
         Accumulators.clear
+        
         /*
-        Setting the accumulators executor to this object. Accumulator will call
+        Setting the WeakShared executor to this object. WeakShared will call
         sendWeakShared()
         */
-        Accumulators.setExecutor(thisExecutor)
-        savedExecutorDriver = d
-        savedTaskDescription = desc
-        
+        WeakShared.setExecutor(thisExecutor, d, desc)
 
         val task = Utils.deserialize[Task[Any]](desc.getData.toByteArray, classLoader)
         for (gen <- task.generation) // Update generation if any is set
@@ -179,8 +176,26 @@ class Executor extends org.apache.mesos.Executor with Logging {
   }
 
   override def shutdown(d: ExecutorDriver) {}
+ 
+  def printToFile(f: java.io.File)(op: java.io.PrintWriter => Unit) {
+    val p = new java.io.PrintWriter(f)
+    try { op(p) } finally { p.close() }
+  }
 
-  override def frameworkMessage(d: ExecutorDriver, data: Array[Byte]) {}
+  override def frameworkMessage(d: ExecutorDriver, data: Array[Byte]) {
+        println("received a message of size "+data.size)
+        var w = new DoubleWeakSharable(0.0)
+        try{
+            w.value = Utils.deserialize[WeakSharable[Double]](data).value
+        }
+        catch{
+            case e: Exception => logInfo("ERROR: Could not deserialize")
+        }
+        println("going to test")
+        println("testing ws value after receiving"+WeakShared.ws.value)
+        WeakShared.ws.monotonicUpdate(w)
+        printToFile(f)(p => {p.println(w.value)})
+  }
 }
 
 /**

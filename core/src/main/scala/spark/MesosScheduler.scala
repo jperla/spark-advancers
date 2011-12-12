@@ -18,6 +18,7 @@ import org.apache.mesos.{Scheduler => MScheduler}
 import org.apache.mesos._
 import org.apache.mesos.Protos._
 
+
 /**
  * The main Scheduler implementation, which runs jobs on Mesos. Clients should
  * first call start(), then submit tasks through the runTasks method.
@@ -346,7 +347,18 @@ extends MScheduler with DAGScheduler with Logging
     return Utils.serialize(props.toArray)
   }
 
-  override def frameworkMessage(d: SchedulerDriver, s: SlaveID, e: ExecutorID, b: Array[Byte]) {}
+  def sendUpdatedWeakShared[T] (w: WeakSharable[T]) {
+    for ((taskID, slaveID) <- taskIdToSlaveId) {
+        var s = SlaveID.newBuilder().setValue(slaveID).build()
+        var e = ExecutorID.newBuilder().setValue("default").build()
+        var status = driver.sendFrameworkMessage(s, e, Utils.serialize(w))
+        //logInfo("Sending the latest weaksharable "+w.value+" to slave:"+slaveID)
+    }
+  }
+
+  override def frameworkMessage(d: SchedulerDriver, s: SlaveID, e: ExecutorID, b: Array[Byte]) {
+    logInfo("Received an updated WeakShared from master in MesosScheduler")
+  }
 
   override def slaveLost(d: SchedulerDriver, s: SlaveID) {
     slavesWithExecutors.remove(s.getValue)

@@ -38,7 +38,7 @@ extends Job(jobId) with Logging
 
   var tasksLaunched = 0
   var tasksFinished = 0
-  var d = new DoubleWeakSharable(0.0)
+  WeakShared.ws = new DoubleWeakSharable(0.0)
 
   // Last time when we launched a preferred task (for delay scheduling)
   var lastPreferredLaunchTime = System.currentTimeMillis
@@ -210,9 +210,10 @@ extends Job(jobId) with Logging
 
         val hardcoded_id = 0
         var newWeak = result(hardcoded_id).asInstanceOf[WeakSharable[Double]]
-        d.monotonicUpdate(newWeak)
+        WeakShared.ws.monotonicUpdate(newWeak)
 
-        logInfo("Received weak at master from "+index+" "+d.value+","+newWeak.value) 
+        //logInfo("Received WeakSharable @ master from "+tid+" "+d.value+","+newWeak.value)
+        sched.sendUpdatedWeakShared(WeakShared.ws)
     }
   }
 

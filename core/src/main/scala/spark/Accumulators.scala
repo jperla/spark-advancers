@@ -50,15 +50,8 @@ private object Accumulators
   val localAccums = Map[Thread, Map[Long, Accumulator[_]]]()
   var lastId: Long = 0
   
-  /*Callback into Executor*/
-  var executor: Executor = null
-
   def newId: Long = synchronized { lastId += 1; return lastId }
     
-  def setExecutor(e : Executor) { executor = e }
- 
-  def sendWeakShared[T](w: WeakSharable[T]) { executor.sendWeakShared(w)}
-
   def register(a: Accumulator[_], original: Boolean): Unit = synchronized {
     if (original) {
       originals(a.id) = a
