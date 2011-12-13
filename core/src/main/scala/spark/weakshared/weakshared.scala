@@ -31,13 +31,13 @@ object WeakShared {
 }
 
 
-class DoubleWeakSharable (v: Double = 0.0) extends WeakSharable[Double]
+class DoubleWeakSharable (v: Double = Double.PositiveInfinity) extends WeakSharable[Double]
 {
 	value = v
 	
     def monotonicUpdate(newT: WeakSharable[Double]) = 
 	{
-		if (newT.value > value)
+		if (newT.value < value)
 			value = newT.value
 	}
 }

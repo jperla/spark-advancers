@@ -25,7 +25,7 @@ class Executor extends org.apache.mesos.Executor with Logging {
   var thisExecutor = this 
   val f = new File("/home/princeton_ram/spark/logrecv.txt")
   println("Creating ws")
-  WeakShared.ws = new DoubleWeakSharable(0.0) 
+  WeakShared.ws = new DoubleWeakSharable(Double.PositiveInfinity) 
 
   initLogging()
 
@@ -184,7 +184,7 @@ class Executor extends org.apache.mesos.Executor with Logging {
 
   override def frameworkMessage(d: ExecutorDriver, data: Array[Byte]) {
         println("received a message of size "+data.size)
-        var w = new DoubleWeakSharable(0.0)
+        var w = new DoubleWeakSharable(Double.PositiveInfinity)
         try{
             w.value = Utils.deserialize[WeakSharable[Double]](data).value
         }

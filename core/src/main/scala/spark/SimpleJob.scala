@@ -38,7 +38,7 @@ extends Job(jobId) with Logging
 
   var tasksLaunched = 0
   var tasksFinished = 0
-  WeakShared.ws = new DoubleWeakSharable(0.0)
+  WeakShared.ws = new DoubleWeakSharable(Double.PositiveInfinity)
 
   // Last time when we launched a preferred task (for delay scheduling)
   var lastPreferredLaunchTime = System.currentTimeMillis
