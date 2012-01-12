@@ -200,27 +200,13 @@ extends Job(jobId) with Logging
     try { op(p) } finally { p.close() }
   }
 
-
-  def taskUpdateShared(status: TaskStatus) {
-    val tid = status.getTaskId.getValue
-    val index = tidToIndex(tid)
-
-    if(!status.getData.isEmpty()) {
-        val result = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
-
-        val hardcoded_id = 1
-        // todo: don't hardcode id. 
-        // don't hardcode double
-        var newVar = result(hardcoded_id).asInstanceOf[UpdatedProgress[Double]]
-
-        logInfo("Received progress @ master from " + tid + " " + newVar.value + "," + index)
-
+  def updateAndSendIfNeeded[T] (varId : Long, newVar : UpdatedProgress[T]) {
         var sendUpdate = false
 
         // put in array if not exists
-        if (UpdatedProgressVars.hasOriginal(hardcoded_id)) {
-            var oldVar = UpdatedProgressVars.originals(hardcoded_id).asInstanceOf[UpdatedProgress[Double]]
-             sendUpdate = oldVar.updateWithoutSend(newVar.value)
+        if (UpdatedProgressVars.hasOriginal(varId)) {
+            var oldVar = UpdatedProgressVars.originals(varId).asInstanceOf[UpdatedProgress[T]]
+            sendUpdate = oldVar.updateWithoutSend(newVar.value)
         } else {
             logInfo("registering newVar " + newVar.id)
             UpdatedProgressVars.register(newVar, true)
@@ -229,6 +215,21 @@ extends Job(jobId) with Logging
 
         if (sendUpdate) {
             sched.sendUpdatedProgress(newVar)
+        }
+  }
+
+  def taskUpdateShared(status: TaskStatus) {
+    val tid = status.getTaskId.getValue
+    val index = tidToIndex(tid)
+
+    if(!status.getData.isEmpty()) {
+        val allVars = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
+
+        // todo: can be sped up by batching the updates
+        for ((varId, newVarUntyped) <- allVars) {
+            var newVar = newVarUntyped.asInstanceOf[UpdatedProgress[_]]
+            logInfo("Received progress @ master from " + tid + " " + newVar.id + ":" + newVar.value + "," + index)
+            updateAndSendIfNeeded(varId, newVar)
         }
     }
   }

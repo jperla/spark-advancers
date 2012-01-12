@@ -115,6 +115,8 @@ object WSTSP {
 
 
         var bestTour = sc.updatedProgress(Double.PositiveInfinity)
+        var randomCounter = sc.updatedProgress(Double.PositiveInfinity)
+
         for (i <- sc.parallelize(1 to iter, slices)) {
             var rand = LocalRandom.getRandom()
             var shuffled = ArrayBuffer.empty[Int]
@@ -135,6 +137,9 @@ object WSTSP {
 
             //WeakShared.ws.monotonicUpdate(new DoubleWeakSharable(score))
             bestTour.update(score)
+            if (i % 1000 == 0) {
+                randomCounter.update(-i)
+            }
 
             /*
             if ( i % 1000 == 0 ) {

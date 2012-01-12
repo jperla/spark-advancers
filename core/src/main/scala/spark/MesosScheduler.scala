@@ -348,7 +348,7 @@ extends MScheduler with DAGScheduler with Logging
   }
 
     
-  def sendUpdatedProgress[T] (p: UpdatedProgress[Double]) {
+  def sendUpdatedProgress[T] (p: UpdatedProgress[T]) {
     for ((taskID, slaveID) <- taskIdToSlaveId) {
         var s = SlaveID.newBuilder().setValue(slaveID).build()
         var e = ExecutorID.newBuilder().setValue("default").build()

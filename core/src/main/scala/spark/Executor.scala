@@ -61,9 +61,7 @@ class Executor extends org.apache.mesos.Executor with Logging {
   def sendUpdatedProgress[T](p: UpdatedProgress[T], d: ExecutorDriver, t: TaskDescription) 
   {
     var updates = scala.collection.mutable.Map[Long, Any]()
-    // todo: don't hardcode id
-    val hardcoded_id = 1
-    updates(hardcoded_id) = p
+    updates(p.id) = p
     d.sendStatusUpdate(TaskStatus.newBuilder()
                         .setTaskId(t.getTaskId)
                         .setState(TaskState.TASK_RUNNING)
