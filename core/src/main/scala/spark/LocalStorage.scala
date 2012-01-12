@@ -15,10 +15,10 @@ object LocalRandom {
     val seed = InetAddress.getLocalHost().hashCode()
     val rand = new Random(seed)
 
-    var tempTour = randomCycle(29, rand)
+    var tempTour = randomCycle(7663, rand)
 
     var data = ArrayBuffer.empty[Array[Double]]
-    for(line <- Source.fromFile("/home/princeton_ram/spark/tspSahara.txt").getLines()) {
+    for(line <- Source.fromFile("/home/princeton_ram/weakshared/ym7663.tsp").getLines()) {
             var city = new Array[Double](2)
             var node = line.split(' ')
             city(0) = node(1).toDouble
