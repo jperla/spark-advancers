@@ -27,6 +27,14 @@ class Accumulator[T] (
 
   // Called by Java when deserializing an object
   private def readObject(in: ObjectInputStream) {
+    /*
+    try{
+        throw new Exception() 
+    }
+    catch {
+        case e: Exception => e.printStackTrace()
+    }
+    */
     in.defaultReadObject
     value_ = zero
     deserialized = true

@@ -9,7 +9,6 @@ import scala.util.Random
 import scala.collection.immutable._
 import java.io._
 
-
 /*
 class TSPState (t: ArrayBuffer[Int] = ArrayBuffer.empty[Int], c: Double = -1) extends Serializable {
     var tour = t
@@ -40,6 +39,19 @@ object TSPStateAccumulatorParam extends AccumulatorParam[TSPState] {
 
 */
 object WSTSP {
+  implicit object MinDoubleUpdatedProgressParam extends UpdatedProgressParam[Double] {
+    def monotonicUpdate(old : UpdatedProgress[Double], newT: Double) : Boolean = 
+	{
+		if (newT < old.value) {
+			old.updateValue(newT)
+            return true
+        } else {
+            return false
+        }
+	}
+    def zero(initialValue: Double) = Double.PositiveInfinity
+  }
+
 
     def randomCycle (size: Int, rand: Random): ArrayBuffer[Int] =  {
         var randNodes = ArrayBuffer.empty[Int]
@@ -99,10 +111,13 @@ object WSTSP {
         everything in locally for now*/
         //var bdata = sc.broadcast(data)
 
+
+        var bestTour = sc.updatedProgress(Double.PositiveInfinity)
         for (i <- sc.parallelize(1 to iter, slices)) {
             var rand = LocalRandom.getRandom()
             var shuffled = ArrayBuffer.empty[Int]
             
+            /*
             if (tour.value.cost == WeakShared.ws.value){
                 //throw new IOException("found an equal value")
                 println("found equal value!!!")
@@ -111,19 +126,26 @@ object WSTSP {
             } else {
                 shuffled = randomCycle(LocalRandom.tempTour.length, rand)
             }
+            */
+            shuffled = randomCycle(LocalRandom.tempTour.length, rand)
                 
             var score = scoreCycle(shuffled, LocalRandom.getData())
-            WeakShared.ws.monotonicUpdate(new DoubleWeakSharable(score))
+
+            //WeakShared.ws.monotonicUpdate(new DoubleWeakSharable(score))
+            bestTour.update(score)
+
+            /*
             if ( i % 1000 == 0 ) {
                 WeakShared.sendWeakShared(WeakShared.ws)
             }
+            */
 
             LocalRandom.tempTour = shuffled
 
             var latestTour = new TSPState(shuffled, score)
             tour += latestTour
             var fromopt = score - 27603
-            println("Score is : "+score+" difference is : "+ fromopt +" best is : "+WeakShared.ws.value)
+            //println("Score is : "+score+" difference is : "+ fromopt +" best is : "+WeakShared.ws.value)
         }
         println("the final tour is: "+tour)
         println("the final score is: "+tour.value.cost)

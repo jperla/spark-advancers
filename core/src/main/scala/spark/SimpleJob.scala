@@ -38,7 +38,7 @@ extends Job(jobId) with Logging
 
   var tasksLaunched = 0
   var tasksFinished = 0
-  WeakShared.ws = new DoubleWeakSharable(Double.PositiveInfinity)
+  //WeakShared.ws = new DoubleWeakSharable(Double.PositiveInfinity)
 
   // Last time when we launched a preferred task (for delay scheduling)
   var lastPreferredLaunchTime = System.currentTimeMillis
@@ -205,15 +205,18 @@ extends Job(jobId) with Logging
     val tid = status.getTaskId.getValue
     val index = tidToIndex(tid)
 
-    if(!status.getData.isEmpty()){
+    if(!status.getData.isEmpty()) {
         val result = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
 
         val hardcoded_id = 0
-        var newWeak = result(hardcoded_id).asInstanceOf[WeakSharable[Double]]
-        WeakShared.ws.monotonicUpdate(newWeak)
+        // todo: don't hardcode id. 
+        // don't hardcode double
+        var newVar = result(hardcoded_id).asInstanceOf[UpdatedProgress[Double]]
 
-        //logInfo("Received WeakSharable @ master from "+tid+" "+d.value+","+newWeak.value)
-        sched.sendUpdatedWeakShared(WeakShared.ws)
+        logInfo("Received progress @ master from " + tid + " " + newVar.value + "," + index)
+
+        // todo: send it back to slaves
+        sched.sendUpdatedProgress(newVar)
     }
   }
 

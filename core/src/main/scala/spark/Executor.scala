@@ -25,7 +25,8 @@ class Executor extends org.apache.mesos.Executor with Logging {
   var thisExecutor = this 
   val f = new File("/home/princeton_ram/spark/logrecv.txt")
   println("Creating ws")
-  WeakShared.ws = new DoubleWeakSharable(Double.PositiveInfinity) 
+
+  //WeakShared.ws = new DoubleWeakSharable(Double.PositiveInfinity) 
 
   initLogging()
 
@@ -57,11 +58,25 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
+/*
   def sendWeakShared[T](w: WeakSharable[T], d: ExecutorDriver, t: TaskDescription) 
   {
     var updates = scala.collection.mutable.Map[Long, Any]()
     val hardcoded_id = 0
     updates(hardcoded_id) = w
+    d.sendStatusUpdate(TaskStatus.newBuilder()
+                        .setTaskId(t.getTaskId)
+                        .setState(TaskState.TASK_RUNNING)
+                        .setData(ByteString.copyFrom(Utils.serialize(updates)))
+                        .build())
+  }
+*/
+  def sendUpdatedProgress[T](p: UpdatedProgress[T], d: ExecutorDriver, t: TaskDescription) 
+  {
+    var updates = scala.collection.mutable.Map[Long, Any]()
+    // todo: don't hardcode id
+    val hardcoded_id = 0
+    updates(hardcoded_id) = p
     d.sendStatusUpdate(TaskStatus.newBuilder()
                         .setTaskId(t.getTaskId)
                         .setState(TaskState.TASK_RUNNING)
@@ -87,7 +102,8 @@ class Executor extends org.apache.mesos.Executor with Logging {
         Setting the WeakShared executor to this object. WeakShared will call
         sendWeakShared()
         */
-        WeakShared.setExecutor(thisExecutor, d, desc)
+        //WeakShared.setExecutor(thisExecutor, d, desc)
+        UpdatedProgressObject.setExecutor(thisExecutor, d, desc)
 
         val task = Utils.deserialize[Task[Any]](desc.getData.toByteArray, classLoader)
         for (gen <- task.generation) // Update generation if any is set
@@ -183,18 +199,33 @@ class Executor extends org.apache.mesos.Executor with Logging {
   }
 
   override def frameworkMessage(d: ExecutorDriver, data: Array[Byte]) {
-        println("received a message of size "+data.size)
-        var w = new DoubleWeakSharable(Double.PositiveInfinity)
+        println("received a message of size " + data.size)
+
+        //todo: dont hardcode Double
+        var p = Double.PositiveInfinity;
         try{
-            w.value = Utils.deserialize[WeakSharable[Double]](data).value
+           p = Utils.deserialize[UpdatedProgress[Double]](data).value
         }
         catch{
             case e: Exception => logInfo("ERROR: Could not deserialize")
         }
         println("going to test")
-        println("testing ws value after receiving"+WeakShared.ws.value)
-        WeakShared.ws.monotonicUpdate(w)
-        printToFile(f)(p => {p.println(w.value)})
+
+        
+
+       println("going to test")
+       println("testing ws value after receiving" + p)
+
+
+       var map = scala.collection.mutable.Map[Long,Any]()
+       //todo: do not hardcode
+       val hardcodedId = 0
+       map(hardcodedId) = p
+       UpdatedProgressVars.add(map)
+
+       //printToFile(f)(p => {p.println(w.value)})
+
+
   }
 }
 

@@ -210,6 +210,10 @@ extends Logging {
   def broadcast[T](value: T) = 
     Broadcast.getBroadcastFactory.newBroadcast[T] (value, isLocal)
 
+  def updatedProgress[T](initialValue: T)(implicit param: UpdatedProgressParam[T]) =
+    new UpdatedProgress(initialValue, param)
+
+
   // Stop the SparkContext
   def stop() {
      scheduler.stop()
@@ -318,6 +322,7 @@ object SparkContext {
     def zero(initialValue: Int) = 0
   }
   
+
 
   // TODO: Add AccumulatorParams for other types, e.g. lists and strings
 
