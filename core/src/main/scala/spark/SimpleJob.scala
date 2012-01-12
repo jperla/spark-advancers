@@ -208,15 +208,28 @@ extends Job(jobId) with Logging
     if(!status.getData.isEmpty()) {
         val result = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
 
-        val hardcoded_id = 0
+        val hardcoded_id = 1
         // todo: don't hardcode id. 
         // don't hardcode double
         var newVar = result(hardcoded_id).asInstanceOf[UpdatedProgress[Double]]
 
         logInfo("Received progress @ master from " + tid + " " + newVar.value + "," + index)
 
-        // todo: send it back to slaves
-        sched.sendUpdatedProgress(newVar)
+        var sendUpdate = false
+
+        // put in array if not exists
+        if (UpdatedProgressVars.hasOriginal(hardcoded_id)) {
+            var oldVar = UpdatedProgressVars.originals(hardcoded_id).asInstanceOf[UpdatedProgress[Double]]
+             sendUpdate = oldVar.updateWithoutSend(newVar.value)
+        } else {
+            logInfo("registering newVar " + newVar.id)
+            UpdatedProgressVars.register(newVar, true)
+            sendUpdate  = true
+        }
+
+        if (sendUpdate) {
+            sched.sendUpdatedProgress(newVar)
+        }
     }
   }
 

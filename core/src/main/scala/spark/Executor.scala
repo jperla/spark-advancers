@@ -58,24 +58,11 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
-/*
-  def sendWeakShared[T](w: WeakSharable[T], d: ExecutorDriver, t: TaskDescription) 
-  {
-    var updates = scala.collection.mutable.Map[Long, Any]()
-    val hardcoded_id = 0
-    updates(hardcoded_id) = w
-    d.sendStatusUpdate(TaskStatus.newBuilder()
-                        .setTaskId(t.getTaskId)
-                        .setState(TaskState.TASK_RUNNING)
-                        .setData(ByteString.copyFrom(Utils.serialize(updates)))
-                        .build())
-  }
-*/
   def sendUpdatedProgress[T](p: UpdatedProgress[T], d: ExecutorDriver, t: TaskDescription) 
   {
     var updates = scala.collection.mutable.Map[Long, Any]()
     // todo: don't hardcode id
-    val hardcoded_id = 0
+    val hardcoded_id = 1
     updates(hardcoded_id) = p
     d.sendStatusUpdate(TaskStatus.newBuilder()
                         .setTaskId(t.getTaskId)
@@ -205,13 +192,11 @@ class Executor extends org.apache.mesos.Executor with Logging {
         var p = Double.PositiveInfinity;
         try{
            p = Utils.deserialize[UpdatedProgress[Double]](data).value
+           println("successfully deserialized")
         }
         catch{
             case e: Exception => logInfo("ERROR: Could not deserialize")
         }
-        println("going to test")
-
-        
 
        println("going to test")
        println("testing ws value after receiving" + p)
@@ -219,13 +204,11 @@ class Executor extends org.apache.mesos.Executor with Logging {
 
        var map = scala.collection.mutable.Map[Long,Any]()
        //todo: do not hardcode
-       val hardcodedId = 0
+       val hardcodedId = 1
        map(hardcodedId) = p
        UpdatedProgressVars.add(map)
 
        //printToFile(f)(p => {p.println(w.value)})
-
-
   }
 }
 

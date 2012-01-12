@@ -43,7 +43,9 @@ object WSTSP {
     def monotonicUpdate(old : UpdatedProgress[Double], newT: Double) : Boolean = 
 	{
 		if (newT < old.value) {
+            println("old value was " + old.value);
 			old.updateValue(newT)
+            println("updated value to " + old.value);
             return true
         } else {
             return false

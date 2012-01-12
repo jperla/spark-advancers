@@ -14,7 +14,7 @@ class UpdatedProgress[T] (
   @transient initialValue: T, param: UpdatedProgressParam[T]) extends Serializable
 {
   val id = UpdatedProgressVars.newId
-  @transient var value_ = initialValue // Current value on master
+  var value_ = initialValue
   val zero = param.zero(initialValue)  // Zero value to be passed to workers
   var deserialized = false
 
@@ -23,12 +23,13 @@ class UpdatedProgress[T] (
   def update (term: T) {
     var sendUpdate = updateWithoutSend(term)
     if (sendUpdate) {
+        println("new value to send will be " + value_)
         UpdatedProgressObject.sendUpdatedProgress(this)
     }
   }
 
-  def updateValue (t : T) {
-    value_ = value
+  def updateValue (v : T) {
+    value_ = v
   }
 
   def updateWithoutSend (term: T) : Boolean = {
@@ -45,7 +46,8 @@ class UpdatedProgress[T] (
   // Called by Java when deserializing an object
   private def readObject(in: ObjectInputStream) {
     in.defaultReadObject
-    value_ = zero
+    // don't initialize to 0 use same one
+    //value_ = zero
     deserialized = true
     UpdatedProgressVars.register(this, false)
   }
@@ -96,6 +98,10 @@ private object UpdatedProgressVars
     }
   }
 
+  def hasOriginal(id: Long) : Boolean = {
+    return originals.contains(id)
+  }
+
   // Clear the local (non-original) vars for the current thread
   def clear: Unit = synchronized { 
     localVars.remove(Thread.currentThread)
@@ -118,44 +124,3 @@ private object UpdatedProgressVars
     }
   }
 }
-
-/*
-trait WeakSharable[T] extends Serializable {
-  var value: T = _
-  def monotonicUpdate(newT: WeakSharable[T])
-}
-
-
-object WeakShared {
-    var executor_callback : Executor = null
-    var executor_driver : ExecutorDriver = null
-    var task_description : TaskDescription = null
-    var ws : DoubleWeakSharable = null
-
-    //This is wrong. Task description gets overwritten by each task running on a machine.
-    //we should fix this when we move to actors
-    def setExecutor (e: Executor, d: ExecutorDriver, t: TaskDescription) { 
-        executor_callback = e 
-        executor_driver = d
-        task_description = t
-    }
-
-    def sendWeakShared[T](w: WeakSharable[T]){
-        executor_callback.sendWeakShared(w, executor_driver, task_description)
-    }
-
-}
-
-
-class DoubleWeakSharable (v: Double = Double.PositiveInfinity) extends WeakSharable[Double]
-{
-	value = v
-	
-    def monotonicUpdate(newT: WeakSharable[Double]) = 
-	{
-		if (newT.value < value)
-			value = newT.value
-	}
-}
-
-*/
