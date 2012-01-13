@@ -4,6 +4,7 @@ import java.io._
 import org.apache.mesos._
 import org.apache.mesos.Protos._
 import scala.collection.mutable.Map
+import scala.collection.mutable.ArrayBuffer
 
 trait UpdatedProgressModifier[G,T] extends Serializable {
   def zero(initialValue: T): T
@@ -115,6 +116,10 @@ object UpdatedProgressObject {
 // if there's a more intuitive way of doing it right
 private object UpdatedProgressVars
 {
+  var Z = ArrayBuffer[Double]()
+  var numIterations = 0
+
+
   // TODO: Use soft references? => need to make readObject work properly then
   val originals = Map[Long, UpdatedProgress[_,_]]()
   val localVars = Map[Thread, Map[Long, UpdatedProgress[_,_]]]()
