@@ -13,8 +13,9 @@ trait UpdatedProgressModifier[G,T] extends Serializable {
   def makeMessage (oldVar: UpdatedProgress[G,T], message: G) : UpdatedProgressMasterMessage[G,T]
 }
 
-class UpdatedProgressMasterMessage[G,T] (
-    var id:Long, var message: G, @transient theType: T) extends Serializable {
+trait UpdatedProgressMasterMessage[G,T] extends Serializable {
+  def id : Long
+  def message : G
 }
 
 trait UpdatedProgressDiff[G,T] extends Serializable {
@@ -106,26 +107,29 @@ object UpdatedProgressObject {
 
 
   class MinDoubleUpdatedProgressMasterMessage (
-    id:Long, message: Double, @transient theType: Double) extends UpdatedProgressMasterMessage[Double,Double]
+    var id:Long, var message: Double, @transient theType: Double) extends UpdatedProgressMasterMessage[Double,Double]
   {
+    override def toString = "id:" + id.toString + ":" + message.toString
   }
 
   class MinDoubleUpdatedProgressDiff (
     var id:Long, @transient message: Double, @transient theType: Double) extends UpdatedProgressDiff[Double,Double]
   {
-    myValue = message
+    var myValue = message
     def update(oldVar : UpdatedProgress[Double,Double]) = {
         if (myValue < oldVar.value) {
             oldVar.value = myValue
         }
     }
+
+    override def toString = "id:" + id.toString + ":" + myValue.toString
   }
 
   object MinDoubleUpdatedProgressModifier extends UpdatedProgressModifier[Double,Double] {
     def updateLocalDecideSend(oldVar: UpdatedProgress[Double,Double], message: Double) : Boolean = {
 		if (message < oldVar.value) {
             println("old value was " + oldVar.value);
-			oldVar.updateValue(newT)
+			oldVar.updateValue(message)
             println("updated value to " + oldVar.value);
             return true
         } else {
@@ -138,14 +142,13 @@ object UpdatedProgressObject {
         var doSend = updateLocalDecideSend(oldVar, message)
 
         // todo: why am i sending these things, do i have to? 0.0 transient?!
-        var diff = MinDoubleUpdatedProgressDiff(oldVar.id, message, 0.0)
-        diff.setMyValue(message)
+        var diff = new MinDoubleUpdatedProgressDiff(oldVar.id, message, 0.0)
         return diff
     }
 
     def makeMessage (oldVar: UpdatedProgress[Double,Double], message: Double) : UpdatedProgressMasterMessage[Double,Double] = {
         // todo: why am i sending these things, do i have to? 0.0 transient?!
-        return MinDoubleUpdatedProgressMasterMessage(oldVar.id, message, 0.0)
+        return new MinDoubleUpdatedProgressMasterMessage(oldVar.id, message, 0.0)
     }
   }
 
@@ -189,8 +192,16 @@ private object UpdatedProgressVars
   }
 
   def applyDiff[G,T] (diff : UpdatedProgressDiff[G,T]) = synchronized {
-    var up = localVars(Thread.currentThread)(diff.id).asInstanceOf[UpdatedProgress[G,T]]
-    diff.update(up)
+    var vars = localVars.getOrElse(Thread.currentThread, Map())
+
+    if (vars.contains(diff.id)) {
+        val v = vars(diff.id)
+
+        var up = v.asInstanceOf[UpdatedProgress[G,T]]
+        diff.update(up)
+    } else {
+        println("cannot apply diff: " + diff)
+    }
   }
 
   // Add values to the original vars with some given IDs
