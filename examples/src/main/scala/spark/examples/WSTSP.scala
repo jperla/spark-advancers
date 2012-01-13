@@ -6,8 +6,10 @@ import scala.io.Source
 import scala.io.Source._
 import scala.collection.mutable._
 import scala.util.Random
-import scala.collection.immutable._
+//import scala.collection.immutable._
 import java.io._
+
+import scala.collection.mutable.Map
 
 /*
 class TSPState (t: ArrayBuffer[Int] = ArrayBuffer.empty[Int], c: Double = -1) extends Serializable {
@@ -101,8 +103,9 @@ object WSTSP {
         //var bdata = sc.broadcast(data)
 
 
-        var bestTour = sc.updatedProgress(Double.PositiveInfinity, MinDoubleUpdatedProgressModifier)
-        var randomCounter = sc.updatedProgress(Double.PositiveInfinity, MinDoubleUpdatedProgressModifier)
+        var bestTour = sc.updatedProgress(Double.PositiveInfinity, MinDoubleProgress.Modifier)
+        var randomCounter = sc.updatedProgress(Double.PositiveInfinity, MinDoubleProgress.Modifier)
+        var modInts = sc.updatedProgress(Map[String,Int](), StringMaxIntMapProgress.Modifier)
 
         for (i <- sc.parallelize(1 to iter, slices)) {
             var rand = LocalRandom.getRandom()
@@ -128,6 +131,8 @@ object WSTSP {
             if (i % 1000 == 0) {
                 randomCounter.advance(-i)
             }
+            var s = (i % 10).toString
+            modInts.advance((s, i / 1000))
 
             /*
             if ( i % 1000 == 0 ) {

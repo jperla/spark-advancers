@@ -10,7 +10,7 @@ trait UpdatedProgressModifier[G,T] extends Serializable {
 
   def updateLocalDecideSend(oldVar: UpdatedProgress[G,T], message: G) : Boolean
   def masterAggregate (oldVar: UpdatedProgress[G,T], message: G) : UpdatedProgressDiff[G,T]
-  def makeMessage (oldVar: UpdatedProgress[G,T], message: G) : UpdatedProgressMasterMessage[G,T]
+  def makeMasterMessage (oldVar: UpdatedProgress[G,T], message: G) : UpdatedProgressMasterMessage[G,T]
 }
 
 trait UpdatedProgressMasterMessage[G,T] extends Serializable {
@@ -39,7 +39,7 @@ class UpdatedProgress[G,T] (
     var doSend = param.updateLocalDecideSend(this, message)
     if (doSend) {
         println("new value to send will be " + message)
-        var upmm = param.makeMessage(this, message)
+        var upmm = param.makeMasterMessage(this, message)
         UpdatedProgressObject.sendUpdatedProgressMasterMessage(upmm)
     }
 
@@ -106,51 +106,8 @@ object UpdatedProgressObject {
 }
 
 
-  class MinDoubleUpdatedProgressMasterMessage (
-    var id:Long, var message: Double, @transient theType: Double) extends UpdatedProgressMasterMessage[Double,Double]
-  {
-    override def toString = "id:" + id.toString + ":" + message.toString
-  }
 
-  class MinDoubleUpdatedProgressDiff (
-    var id:Long, @transient message: Double, @transient theType: Double) extends UpdatedProgressDiff[Double,Double]
-  {
-    var myValue = message
-    def update(oldVar : UpdatedProgress[Double,Double]) = {
-        if (myValue < oldVar.value) {
-            oldVar.value = myValue
-        }
-    }
 
-    override def toString = "id:" + id.toString + ":" + myValue.toString
-  }
-
-  object MinDoubleUpdatedProgressModifier extends UpdatedProgressModifier[Double,Double] {
-    def updateLocalDecideSend(oldVar: UpdatedProgress[Double,Double], message: Double) : Boolean = {
-		if (message < oldVar.value) {
-            println("old value was " + oldVar.value);
-			oldVar.updateValue(message)
-            println("updated value to " + oldVar.value);
-            return true
-        } else {
-            return false
-        }
-	}
-    def zero(initialValue: Double) = Double.PositiveInfinity
-
-    def masterAggregate (oldVar: UpdatedProgress[Double,Double], message: Double) : UpdatedProgressDiff[Double,Double] = {
-        var doSend = updateLocalDecideSend(oldVar, message)
-
-        // todo: why am i sending these things, do i have to? 0.0 transient?!
-        var diff = new MinDoubleUpdatedProgressDiff(oldVar.id, message, 0.0)
-        return diff
-    }
-
-    def makeMessage (oldVar: UpdatedProgress[Double,Double], message: Double) : UpdatedProgressMasterMessage[Double,Double] = {
-        // todo: why am i sending these things, do i have to? 0.0 transient?!
-        return new MinDoubleUpdatedProgressMasterMessage(oldVar.id, message, 0.0)
-    }
-  }
 
 
 
