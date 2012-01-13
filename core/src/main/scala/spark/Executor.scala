@@ -58,7 +58,7 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
-  def sendUpdatedProgress[T](p: UpdatedProgress[T], d: ExecutorDriver, t: TaskDescription) 
+  def sendUpdatedProgressMasterMessage[G,T](p: UpdatedProgressMasterMessage[G,T], d: ExecutorDriver, t: TaskDescription) 
   {
     var updates = scala.collection.mutable.Map[Long, Any]()
     updates(p.id) = p
@@ -187,25 +187,20 @@ class Executor extends org.apache.mesos.Executor with Logging {
         println("received a message of size " + data.size)
 
         //todo: dont hardcode Double
-        var p = Double.PositiveInfinity;
-        try{
-           p = Utils.deserialize[UpdatedProgress[Double]](data).value
+        //try{
+           var p = Utils.deserialize[UpdatedProgressDiff[_,_]](data)
            println("successfully deserialized")
-        }
+        /* 
+        //}
         catch{
             case e: Exception => logInfo("ERROR: Could not deserialize")
         }
+        */
 
        println("going to test")
        println("testing ws value after receiving" + p)
 
-
-       var map = scala.collection.mutable.Map[Long,Any]()
-       //todo: do not hardcode
-       val hardcodedId = 1
-       map(hardcodedId) = p
-       UpdatedProgressVars.add(map)
-
+       UpdatedProgressVars.applyDiff(p)
        //printToFile(f)(p => {p.println(w.value)})
   }
 }

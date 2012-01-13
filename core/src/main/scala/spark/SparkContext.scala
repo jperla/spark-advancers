@@ -210,7 +210,7 @@ extends Logging {
   def broadcast[T](value: T) = 
     Broadcast.getBroadcastFactory.newBroadcast[T] (value, isLocal)
 
-  def updatedProgress[T](initialValue: T)(implicit param: UpdatedProgressParam[T]) =
+  def updatedProgress[G,T](initialValue: T, param: UpdatedProgressModifier[G,T]) =
     new UpdatedProgress(initialValue, param)
 
 

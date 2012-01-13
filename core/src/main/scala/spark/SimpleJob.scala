@@ -200,21 +200,24 @@ extends Job(jobId) with Logging
     try { op(p) } finally { p.close() }
   }
 
-  def updateAndSendIfNeeded[T] (varId : Long, newVar : UpdatedProgress[T]) {
-        var sendUpdate = false
+  def updateAndSendIfNeeded[G,T] (varId : Long, message : UpdatedProgressMasterMessage[G,T]) {
 
         // put in array if not exists
-        if (UpdatedProgressVars.hasOriginal(varId)) {
-            var oldVar = UpdatedProgressVars.originals(varId).asInstanceOf[UpdatedProgress[T]]
-            sendUpdate = oldVar.updateWithoutSend(newVar.value)
+        //if (UpdatedProgressVars.hasOriginal(varId)) {
+
+        var oldVar = UpdatedProgressVars.originals(varId).asInstanceOf[UpdatedProgress[G,T]]
+        var updateToSend = oldVar.masterAggregate(message.message)
+
+        /* 
         } else {
             logInfo("registering newVar " + newVar.id)
             UpdatedProgressVars.register(newVar, true)
-            sendUpdate  = true
+            updateToSend = true
         }
+        */
 
-        if (sendUpdate) {
-            sched.sendUpdatedProgress(newVar)
+        if (updateToSend != null) {
+            sched.sendUpdatedProgressDiff(updateToSend)
         }
   }
 
@@ -226,9 +229,9 @@ extends Job(jobId) with Logging
         val allVars = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
 
         // todo: can be sped up by batching the updates
-        for ((varId, newVarUntyped) <- allVars) {
-            var newVar = newVarUntyped.asInstanceOf[UpdatedProgress[_]]
-            logInfo("Received progress @ master from " + tid + " " + newVar.id + ":" + newVar.value + "," + index)
+        for ((varId, newMasterMessageUntyped) <- allVars) {
+            var newVar = newMasterMessageUntyped.asInstanceOf[UpdatedProgressMasterMessage[_,_]]
+            logInfo("Received message @ master from " + tid + " " + newVar.id + ":" + newVar + "," + index)
             updateAndSendIfNeeded(varId, newVar)
         }
     }

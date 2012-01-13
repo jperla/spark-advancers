@@ -39,20 +39,7 @@ object TSPStateAccumulatorParam extends AccumulatorParam[TSPState] {
 
 */
 object WSTSP {
-  implicit object MinDoubleUpdatedProgressParam extends UpdatedProgressParam[Double] {
-    def monotonicUpdate(old : UpdatedProgress[Double], newT: Double) : Boolean = 
-	{
-		if (newT < old.value) {
-            println("old value was " + old.value);
-			old.updateValue(newT)
-            println("updated value to " + old.value);
-            return true
-        } else {
-            return false
-        }
-	}
-    def zero(initialValue: Double) = Double.PositiveInfinity
-  }
+
 
 
     def randomCycle (size: Int, rand: Random): ArrayBuffer[Int] =  {
@@ -114,8 +101,8 @@ object WSTSP {
         //var bdata = sc.broadcast(data)
 
 
-        var bestTour = sc.updatedProgress(Double.PositiveInfinity)
-        var randomCounter = sc.updatedProgress(Double.PositiveInfinity)
+        var bestTour = sc.updatedProgress(Double.PositiveInfinity, MinDoubleUpdatedProgressModifier)
+        var randomCounter = sc.updatedProgress(Double.PositiveInfinity, MinDoubleUpdatedProgressModifier)
 
         for (i <- sc.parallelize(1 to iter, slices)) {
             var rand = LocalRandom.getRandom()
@@ -136,9 +123,10 @@ object WSTSP {
             var score = scoreCycle(shuffled, LocalRandom.getData())
 
             //WeakShared.ws.monotonicUpdate(new DoubleWeakSharable(score))
-            bestTour.update(score)
+            bestTour.advance(score)
+
             if (i % 1000 == 0) {
-                randomCounter.update(-i)
+                randomCounter.advance(-i)
             }
 
             /*

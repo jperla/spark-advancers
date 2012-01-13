@@ -348,12 +348,12 @@ extends MScheduler with DAGScheduler with Logging
   }
 
     
-  def sendUpdatedProgress[T] (p: UpdatedProgress[T]) {
+  def sendUpdatedProgressDiff[G,T] (p: UpdatedProgressDiff[G,T]) {
     for ((taskID, slaveID) <- taskIdToSlaveId) {
         var s = SlaveID.newBuilder().setValue(slaveID).build()
         var e = ExecutorID.newBuilder().setValue("default").build()
         var status = driver.sendFrameworkMessage(s, e, Utils.serialize(p))
-        logInfo("Sending the latest weaksharable " + p.value + " to slave:" + slaveID)
+        logInfo("Sending the latest weaksharable " + p + " to slave:" + slaveID)
     }
   }
 
