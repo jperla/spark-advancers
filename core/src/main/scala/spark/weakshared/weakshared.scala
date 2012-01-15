@@ -155,14 +155,12 @@ private object UpdatedProgressVars
   }
 
   def applyDiff[G,T] (diff : UpdatedProgressDiff[G,T]) = synchronized {
-    
-    for (thread <- localVars.keys){
+    for (thread <- localVars.keys) {
         var localMap = localVars.apply(thread)
         val v = localMap(diff.id)
         var up = v.asInstanceOf[UpdatedProgress[G,T]]
         diff.update(up)
     }
-            
   }
 
   // Add values to the original vars with some given IDs

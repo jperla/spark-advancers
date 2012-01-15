@@ -6,6 +6,55 @@ import org.apache.mesos.Protos._
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
+object MaxDoubleProgress {
+  type D = Double
+
+  class MasterMessage (
+    var id:Long, var message: D, @transient theType: D) extends UpdatedProgressMasterMessage[D,D]
+  {
+    override def toString = "id:" + id.toString + ":" + message.toString
+  }
+
+  class Diff (
+    var id:Long, @transient message: D, @transient theType: D) extends UpdatedProgressDiff[D,D]
+  {
+    var myValue = message
+    def update(oldVar : UpdatedProgress[D,D]) = {
+        if (myValue > oldVar.value) {
+            oldVar.updateValue(myValue)
+        }
+    }
+
+    override def toString = "id:" + id.toString + ":" + myValue.toString
+  }
+
+  object Modifier extends UpdatedProgressModifier[D,D] {
+    def updateLocalDecideSend(oldVar: UpdatedProgress[D,D], message: D) : Boolean = {
+		if (message > oldVar.value) {
+            println("old value was " + oldVar.value);
+			oldVar.updateValue(message)
+            println("updated value to " + oldVar.value);
+            return true
+        } else {
+            return false
+        }
+	}
+    def zero(initialValue: D) = Double.PositiveInfinity
+
+    def masterAggregate (oldVar: UpdatedProgress[D,D], message: D) : UpdatedProgressDiff[D,D] = {
+        var doSend = updateLocalDecideSend(oldVar, message)
+
+        // todo: why am i sending these things, do i have to? 0.0 transient?!
+        var diff = new Diff(oldVar.id, message, 0.0)
+        return diff
+    }
+
+    def makeMasterMessage (oldVar: UpdatedProgress[D,D], message: D) : UpdatedProgressMasterMessage[D,D] = {
+        // todo: why am i sending these things, do i have to? 0.0 transient?!
+        return new MasterMessage(oldVar.id, message, 0.0)
+    }
+  }
+}
 
 
 
@@ -24,7 +73,7 @@ object MinDoubleProgress {
     var myValue = message
     def update(oldVar : UpdatedProgress[D,D]) = {
         if (myValue < oldVar.value) {
-            oldVar.setValue(myValue)
+            oldVar.updateValue(myValue)
         }
     }
 
