@@ -34,7 +34,9 @@ extends Logging with Serializable {
   def initialize (isMaster__ : Boolean): Unit = synchronized {
     if (!initialized) {
       val broadcastFactoryClass = System.getProperty(
+        //"spark.broadcast.factory", "spark.broadcast.DfsBroadcastFactory")
         "spark.broadcast.factory", "spark.broadcast.BitTorrentBroadcastFactory")
+        //"spark.broadcast.factory", "spark.broadcast.ChainedBroadcastFactory")
 
       broadcastFactory =
         Class.forName(broadcastFactoryClass).newInstance.asInstanceOf[BroadcastFactory]

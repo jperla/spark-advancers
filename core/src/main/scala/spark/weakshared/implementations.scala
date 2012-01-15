@@ -24,7 +24,7 @@ object MinDoubleProgress {
     var myValue = message
     def update(oldVar : UpdatedProgress[D,D]) = {
         if (myValue < oldVar.value) {
-            oldVar.value = myValue
+            oldVar.setValue(myValue)
         }
     }
 
