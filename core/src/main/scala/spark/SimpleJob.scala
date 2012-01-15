@@ -218,6 +218,9 @@ extends Job(jobId) with Logging
 
         if (updateToSend != null) {
             sched.sendUpdatedProgressDiff(updateToSend)
+            println("it is not null")
+        }else{
+            println("It is null")
         }
   }
 
@@ -228,10 +231,11 @@ extends Job(jobId) with Logging
     if(!status.getData.isEmpty()) {
         val allVars = Utils.deserialize[scala.collection.mutable.Map[Long, Any]](status.getData.toByteArray)
 
+        print("allVars: "+allVars)
         // todo: can be sped up by batching the updates
         for ((varId, newMasterMessageUntyped) <- allVars) {
             var newVar = newMasterMessageUntyped.asInstanceOf[UpdatedProgressMasterMessage[_,_]]
-            logInfo("Received message @ master from " + tid + " " + newVar.id + ":" + newVar + "," + index)
+            //logInfo("Received message @ master from " + tid + " " + newVar.id + ":" + newVar + "," + index)
             updateAndSendIfNeeded(varId, newVar)
         }
     }

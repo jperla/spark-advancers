@@ -115,15 +115,35 @@ object StringMaxIntMapProgress {
   }
 }
 
+class LRProgressUpdate (
+    var position: Array[Double], var converged: Boolean) extends Serializable
+{
+    override def toString: String = { 
+        var out = new String
+        for (i <- 0 until position.length){
+            out = out + "position: " + position(i).toString + "\n"
+        }
+        out = out + ":" + converged.toString
+        return out
+    }
+}
 
 object LRProgress {
-  type G = ArrayBuffer[Double]
-  type P = ArrayBuffer[Double]
-
+  type G = Array[Double]
+  type P = LRProgressUpdate
+    
+    
   class MasterMessage (
     var id:Long, var message: G, @transient theType: P) extends UpdatedProgressMasterMessage[G,P]
   {
-    override def toString = "id:" + id.toString + ":" + message.toString
+    override def toString: String = {
+        var out = new String
+        out = out + "\n"+"id: " + id.toString + "\n"
+        for (i <- 0 until message.length){
+            out = out + "message: " + message(i).toString + "\n"
+        }
+        return out
+    } 
   }
 
   class Diff (
@@ -132,30 +152,55 @@ object LRProgress {
     var myValue = theType
     def update(oldVar : UpdatedProgress[G,P]) = {
         // todo: locking?
-        oldVar.value = myValue
+        oldVar.value.converged = myValue.converged
+        for (i <- 0 until oldVar.value.position.length){
+            oldVar.value.position(i) = myValue.position(i)
+        }
     }
 
-    override def toString = "id:" + id.toString + ":" + myValue.toString
+    override def toString = "\n" + "id:" + id.toString + ":" + myValue.toString
   }
 
   object Modifier extends UpdatedProgressModifier[G,P] {
+    val eps = 1e-4
     def updateLocalDecideSend(oldVar: UpdatedProgress[G,P], message: G) : Boolean = {
         // always send G; no change to local state
         return true
 	}
-    def zero(initialValue: P) = ArrayBuffer[Double]()
+    def zero(initialValue: P) = new LRProgressUpdate(Array[Double](initialValue.position.size), false)
 
     def masterAggregate (oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressDiff[G,P] = {
-        while (UpdatedProgressVars.Z.size < oldVar.value.size) {
+        while (UpdatedProgressVars.Z.size < oldVar.value.position.size) {
             UpdatedProgressVars.Z.append(0)
         }
 
-        var alpha = 1 / UpdatedProgressVars.numIterations
-        for(i <- 0 until UpdatedProgressVars.Z.size) { 
-            UpdatedProgressVars.Z(i) = UpdatedProgressVars.Z(i) + message(i)
-            oldVar.value(i) = alpha * UpdatedProgressVars.Z(i)
+        var change = 0.0
+
+        if (UpdatedProgressVars.numIterations%10 == 0){
+            println("Z: \n")
+            for (i <- 0 until UpdatedProgressVars.Z.length){
+                println(UpdatedProgressVars.Z(i))
+            }
+            println("\nX: \n")
+            for (i <- 0 until oldVar.value.position.length){
+                println(oldVar.value.position(i))
+            }
         }
 
+        var alpha = 1.0/(UpdatedProgressVars.numIterations + 1)
+        for(i <- 0 until UpdatedProgressVars.Z.size) { 
+            UpdatedProgressVars.Z(i) = message(i)
+            val newValue = oldVar.value.position(i) + (alpha * UpdatedProgressVars.Z(i))
+            change = change + math.pow((oldVar.value.position(i) -newValue),2)
+            oldVar.value.position(i) = newValue
+        }
+        
+        if (math.pow(change, 0.5) < eps) {
+            oldVar.value.converged = true
+        } else{
+            oldVar.value.converged = false
+        }
+        
         var doSend = true
         UpdatedProgressVars.numIterations += 1
 
@@ -164,7 +209,8 @@ object LRProgress {
     }
 
     def makeMasterMessage (oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressMasterMessage[G,P] = {
-        return new MasterMessage(oldVar.id, message, ArrayBuffer[Double]())
+        return new MasterMessage(oldVar.id, message, 
+            new LRProgressUpdate(Array[Double](oldVar.value.position.size), false))
     }
   }
 }

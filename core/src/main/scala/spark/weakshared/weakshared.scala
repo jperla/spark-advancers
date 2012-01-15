@@ -39,7 +39,7 @@ class UpdatedProgress[G,T] (
   def advance (message: G) = {
     var doSend = param.updateLocalDecideSend(this, message)
     if (doSend) {
-        println("new value to send will be " + message)
+        //println("new value to send will be " + message)
         var upmm = param.makeMasterMessage(this, message)
         UpdatedProgressObject.sendUpdatedProgressMasterMessage(upmm)
     }
@@ -83,6 +83,7 @@ class UpdatedProgress[G,T] (
     deserialized = true
     UpdatedProgressVars.register(this, false)
   }
+
 
   override def toString = value_.toString
 }
@@ -142,7 +143,7 @@ private object UpdatedProgressVars
 
   // Clear the local (non-original) vars for the current thread
   def clear: Unit = synchronized { 
-    localVars.remove(Thread.currentThread)
+    //localVars.remove(Thread.currentThread)
   }
 
   // Get the values of the local vars for the current thread (by ID)
@@ -154,16 +155,14 @@ private object UpdatedProgressVars
   }
 
   def applyDiff[G,T] (diff : UpdatedProgressDiff[G,T]) = synchronized {
-    var vars = localVars.getOrElse(Thread.currentThread, Map())
-
-    if (vars.contains(diff.id)) {
-        val v = vars(diff.id)
-
+    
+    for (thread <- localVars.keys){
+        var localMap = localVars.apply(thread)
+        val v = localMap(diff.id)
         var up = v.asInstanceOf[UpdatedProgress[G,T]]
         diff.update(up)
-    } else {
-        println("cannot apply diff: " + diff)
     }
+            
   }
 
   // Add values to the original vars with some given IDs

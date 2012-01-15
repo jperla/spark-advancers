@@ -353,7 +353,7 @@ extends MScheduler with DAGScheduler with Logging
         var s = SlaveID.newBuilder().setValue(slaveID).build()
         var e = ExecutorID.newBuilder().setValue("default").build()
         var status = driver.sendFrameworkMessage(s, e, Utils.serialize(p))
-        logInfo("Sending the latest weaksharable " + p + " to slave:" + slaveID)
+        println("Sending the latest weaksharable " + p +" to slave:" + slaveID)
     }
   }
 
