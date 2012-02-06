@@ -88,7 +88,8 @@ class Executor extends org.apache.mesos.Executor with Logging {
         sendWeakShared()
         */
         //WeakShared.setExecutor(thisExecutor, d, desc)
-        UpdatedProgressObject.setExecutor(thisExecutor, d, desc)
+        // todo: jperla: remove all this
+        //UpdatedProgressObject.setExecutor(env, thisExecutor, d, desc)
 
         val task = Utils.deserialize[Task[Any]](desc.getData.toByteArray, classLoader)
         for (gen <- task.generation) // Update generation if any is set

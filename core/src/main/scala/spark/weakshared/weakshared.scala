@@ -41,7 +41,11 @@ class UpdatedProgress[G,T] (
     if (doSend) {
         //println("new value to send will be " + message)
         var upmm = param.makeMasterMessage(this, message)
-        UpdatedProgressObject.sendUpdatedProgressMasterMessage(upmm)
+
+        val updatedProgressSharer = SparkEnv.get.updatedProgressSharer
+        updatedProgressSharer.sendUpdatedProgressMasterMessage(upmm)
+        // todo: jperla: remove below
+        //UpdatedProgressObject.sendUpdatedProgressMasterMessage(upmm)
     }
 
   }
@@ -156,6 +160,7 @@ private object UpdatedProgressVars
 
   def applyDiff[G,T] (diff : UpdatedProgressDiff[G,T]) = synchronized {
     for (thread <- localVars.keys) {
+        // todo: jperla: apply()?  why not just localVars(thread) ?
         var localMap = localVars.apply(thread)
         val v = localMap(diff.id)
         var up = v.asInstanceOf[UpdatedProgress[G,T]]

@@ -5,7 +5,8 @@ class SparkEnv (
   val serializer: Serializer,
   val cacheTracker: CacheTracker,
   val mapOutputTracker: MapOutputTracker,
-  val shuffleFetcher: ShuffleFetcher
+  val shuffleFetcher: ShuffleFetcher,
+  val updatedProgressSharer: UpdatedProgressSharer
 )
 
 object SparkEnv {
@@ -28,11 +29,13 @@ object SparkEnv {
 
     val cacheTracker = new CacheTracker(isMaster, cache)
 
+    val updatedProgressSharer = new UpdatedProgressSharer(isMaster)
+
     val mapOutputTracker = new MapOutputTracker(isMaster)
 
     val shuffleFetcherClass = System.getProperty("spark.shuffle.fetcher", "spark.SimpleShuffleFetcher")
     val shuffleFetcher = Class.forName(shuffleFetcherClass).newInstance().asInstanceOf[ShuffleFetcher]
 
-    new SparkEnv(cache, serializer, cacheTracker, mapOutputTracker, shuffleFetcher)
+    new SparkEnv(cache, serializer, cacheTracker, mapOutputTracker, shuffleFetcher, updatedProgressSharer)
   }
 }

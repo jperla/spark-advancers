@@ -188,9 +188,10 @@ extends Job(jobId) with Logging
       case TaskState.TASK_KILLED =>
         taskLost(status)
         
-        //Using one of the free states in Mesos. Will add our own later
-      case TaskState.TASK_RUNNING =>
-        taskUpdateShared(status)
+      // todo: jperla: not needed anymore, may remove
+      //Using one of the free states in Mesos. Will add our own later
+      //case TaskState.TASK_RUNNING =>
+      //  taskUpdateShared(status)
       case _ =>
     }
   }
@@ -200,6 +201,8 @@ extends Job(jobId) with Logging
     try { op(p) } finally { p.close() }
   }
 
+    /*
+    todo: jperla:  remove this code
   def updateAndSendIfNeeded[G,T] (varId : Long, message : UpdatedProgressMasterMessage[G,T]) {
 
         // put in array if not exists
@@ -208,13 +211,6 @@ extends Job(jobId) with Logging
         var oldVar = UpdatedProgressVars.originals(varId).asInstanceOf[UpdatedProgress[G,T]]
         var updateToSend = oldVar.masterAggregate(message.message)
 
-        /* 
-        } else {
-            logInfo("registering newVar " + newVar.id)
-            UpdatedProgressVars.register(newVar, true)
-            updateToSend = true
-        }
-        */
 
         if (updateToSend != null) {
             sched.sendUpdatedProgressDiff(updateToSend)
@@ -240,6 +236,7 @@ extends Job(jobId) with Logging
         }
     }
   }
+  */
 
   def taskFinished(status: TaskStatus) {
     val tid = status.getTaskId.getValue

@@ -5,5 +5,5 @@ if [ "$MESOS_HOME" != "" ]; then
 fi
 export SPARK_HOME=$(cd "$(dirname $0)/.."; pwd)
 echo $SPARK_HOME
-java -Xmx30G -XX:MaxPermSize=15G $EXTRA_ARGS -jar $SPARK_HOME/sbt/sbt-launch-*.jar "$@"
+java -Xmx2G -XX:MaxPermSize=2G $EXTRA_ARGS -jar $SPARK_HOME/sbt/sbt-launch-*.jar "$@"
 

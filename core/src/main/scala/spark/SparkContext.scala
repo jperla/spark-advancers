@@ -45,6 +45,11 @@ extends Logging {
   if (System.getProperty("spark.master.port") == null)
     System.setProperty("spark.master.port", "50501")
 
+  // todo: jperla: is this the best place to do this ?!
+  // used to communicate back information about updated progress shared variables
+  if (System.getProperty("spark.slave.port") == null)
+    System.setProperty("spark.slave.port", "50601")
+
   // Make sure a proper class loader is set for remote actors (unless user set one)
   if (RemoteActor.classLoader == null)
     RemoteActor.classLoader = getClass.getClassLoader
@@ -221,6 +226,7 @@ extends Logging {
      // TODO: Broadcast.stop(), Cache.stop()?
      env.mapOutputTracker.stop()
      env.cacheTracker.stop()
+     env.updatedProgressSharer.stop()
      env.shuffleFetcher.stop()
      SparkEnv.set(null)
   }
