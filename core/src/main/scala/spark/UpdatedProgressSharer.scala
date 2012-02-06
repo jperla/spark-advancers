@@ -17,6 +17,8 @@ class UpdatedProgressMasterSenderActor(_serverUris: HashMap[String, Int]) extend
     var diffsToSend = new HashMap[Long, UpdatedProgressDiff[_,_]]
     var serverUris = _serverUris
 
+    var diffsWillSend = null : HashMap[Long, UpdatedProgressDiff[_,_]]
+
     def act() {
         val port = System.getProperty("spark.master.port").toInt
         RemoteActor.alive(port)
@@ -24,21 +26,28 @@ class UpdatedProgressMasterSenderActor(_serverUris: HashMap[String, Int]) extend
         logInfo("Registered actor on port " + port)
 
         while(true) {
+          var diffsCopy = diffsToSend
+          var serverUrisCopy = serverUris
+
           diffsToSend.synchronized {
-            for(diff <- diffsToSend.values) {
-              // todo: jperla: this sets up and tears down a TCP connection, slow!
-              // improve this by using keeping connections around, or using UDP or something
-              // iterate over serveruris, and send messages
-              serverUris.synchronized {
-                for ((host,port) <- serverUris) {
-                    var slave = RemoteActor.select(Node(host, port), 'UpdatedProgressSharerSlave)
-                    slave ! UpdatedProgressDiffToSlave(diff)
-                    slave = null
-                }
-              }
-            }
-            // sent all diffs, so clear
+            diffsCopy = diffsToSend.clone()
+            // will send all diffs, so clear
             diffsToSend.clear()
+          }
+
+          serverUris.synchronized {
+            serverUrisCopy = serverUris.clone()
+          }
+
+          for(diff <- diffsCopy.values) {
+            // todo: jperla: this sets up and tears down a TCP connection, slow!
+            // improve this by using keeping connections around, or using UDP or something
+            // iterate over serveruris, and send messages
+              for ((host,port) <- serverUrisCopy) {
+                  var slave = RemoteActor.select(Node(host, port), 'UpdatedProgressSharerSlave)
+                  slave ! UpdatedProgressDiffToSlave(diff)
+                  slave = null
+              }
           }
           
           // send to slaves every 50 milliseconds; won't send more than 20 a second to slaves
