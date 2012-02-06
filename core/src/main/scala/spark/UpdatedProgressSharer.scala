@@ -1,6 +1,9 @@
 package spark
 
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.HashSet
+import scala.collection.immutable.TreeMap
 
 import scala.actors._
 import scala.actors.Actor._
@@ -13,11 +16,13 @@ case class UpdatedProgressMessageToMaster(message: UpdatedProgressMasterMessage[
 case class UpdatedProgressDiffToSlave(diff: UpdatedProgressDiff[_,_]) extends UpdatedProgressSharerMessage
 case object StopUpdatedProgressSharer extends UpdatedProgressSharerMessage
 
-class UpdatedProgressMasterSenderActor(_serverUris: HashMap[String, Int]) extends DaemonActor with Logging {
+class UpdatedProgressMasterSenderActor(_serverUris: ArrayBuffer[(String, Int)]) extends DaemonActor with Logging {
     var diffsToSend = new HashMap[Long, UpdatedProgressDiff[_,_]]
     var serverUris = _serverUris
 
-    var diffsWillSend = null : HashMap[Long, UpdatedProgressDiff[_,_]]
+    var diffsWillSend = diffsToSend.clone()
+    var serverWillSend = 0
+    var serverFirstSent = 0
 
     def act() {
         val port = System.getProperty("spark.master.port").toInt
@@ -26,40 +31,77 @@ class UpdatedProgressMasterSenderActor(_serverUris: HashMap[String, Int]) extend
         logInfo("Registered actor on port " + port)
 
         while(true) {
-          var diffsCopy = diffsToSend
-          var serverUrisCopy = serverUris
-
           diffsToSend.synchronized {
-            diffsCopy = diffsToSend.clone()
-            // will send all diffs, so clear
-            diffsToSend.clear()
+            if (diffsToSend.size > 0) {
+              for ((key, value) <- diffsToSend) {
+                diffsWillSend.update(key, value)
+              }
+              // will send all diffs, so clear
+              diffsToSend.clear()
+
+              // todo: jperla: this is a tiny bit bad if there are lots of servers 
+              // and lots of different shared variables updated a lot
+              // not our applications though
+
+              // keep track of this so we can stop when we loop back to this server
+              serverFirstSent = serverWillSend
+              println("new diff to send, new first server: " + serverFirstSent + "/" + serverUris.size)
+            }
           }
+
+          var host = ""
+          var port = 0
 
           serverUris.synchronized {
-            serverUrisCopy = serverUris.clone()
+            if (serverUris.size > 0) {
+              val pair = serverUris(serverWillSend)
+              host = pair._1
+              port = pair._2
+              println("sending to server " + serverWillSend + " @ " + host + ":" + port)
+            }
           }
 
-          for(diff <- diffsCopy.values) {
+          if (diffsWillSend.size > 0 && port > 0) {
+            // still diffs to send, and still new servers to send to
+
             // todo: jperla: this sets up and tears down a TCP connection, slow!
             // improve this by using keeping connections around, or using UDP or something
+            // Q: can master actor handle keeping 800 connections open to slaves?
+
             // iterate over serveruris, and send messages
-              for ((host,port) <- serverUrisCopy) {
-                  var slave = RemoteActor.select(Node(host, port), 'UpdatedProgressSharerSlave)
-                  slave ! UpdatedProgressDiffToSlave(diff)
-                  slave = null
-              }
+            var slave = RemoteActor.select(Node(host, port), 'UpdatedProgressSharerSlave)
+            // send all the diffs to this one server
+            for(diff <- diffsWillSend.values) {
+              slave ! UpdatedProgressDiffToSlave(diff)
+            }
+            slave = null
+          } else {
+            // if no diffs; let them accumulate for 50 ms
+            Thread.sleep(50)
           }
-          
-          // send to slaves every 50 milliseconds; won't send more than 20 a second to slaves
-          // todo: jperla: should probably check immediately if previous step took 50+ milliseconds
-          // todo: jperla: how do we time this?
-          Thread.sleep(50)
+
+          // next loop, do the next server
+          // do this outside the loop so that it sends to different server first every time
+          // loop back around to 0 when hit the end
+          // assumption: serverUris never shrinks
+          if (serverUris.size > 0) {
+            serverWillSend = (serverWillSend + 1) % serverUris.size
+          } else {
+            serverWillSend = 0
+          }
+
+          if (serverWillSend == serverFirstSent && diffsWillSend.size > 0) {
+              // looped back to first server, so clear the diffs we would send
+              println("sent to all servers, done")
+              diffsWillSend.clear() 
+          }
         }
     }
 }
 
 
 class UpdatedProgressMasterReceiverActor(masterSenderActor: UpdatedProgressMasterSenderActor) extends DaemonActor with Logging {
+  val uniqueServers = new HashSet[String]
 
   def act() {
     val port = System.getProperty("spark.master.port").toInt
@@ -72,8 +114,11 @@ class UpdatedProgressMasterReceiverActor(masterSenderActor: UpdatedProgressMaste
       react {
         case SlaveLocation(slaveHost: String, slavePort: Int) =>
           println("Asked to register new slave at " + slaveHost + ":" + slavePort)
-          masterSenderActor.serverUris.synchronized {
-            masterSenderActor.serverUris.put(slaveHost, slavePort)
+          if (!uniqueServers.contains(slaveHost)) {
+            uniqueServers.add(slaveHost)
+            masterSenderActor.serverUris.synchronized {
+              masterSenderActor.serverUris.append((slaveHost, slavePort))
+            }
           }
           reply('OK)
         case UpdatedProgressMessageToMaster(newVar: UpdatedProgressMasterMessage[_,_]) =>
@@ -131,7 +176,7 @@ class UpdatedProgressSharer(isMaster: Boolean) extends Logging {
   var slaveActor: AbstractActor = null
   var masterSenderActor: AbstractActor = null
 
-  private var serverUris = new HashMap[String, Int]
+  private var serverUris = new ArrayBuffer[(String, Int)]
 
   println("is master: " + isMaster)
   
