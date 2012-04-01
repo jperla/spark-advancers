@@ -147,8 +147,8 @@ object WSTSP {
             var fromopt = score - 27603
             //println("Score is : "+score+" difference is : "+ fromopt +" best is : "+WeakShared.ws.value)
         }
-        println("the final tour is: "+tour)
-        println("the final score is: "+tour.value.cost)
+        //println("the final tour is: "+tour)
+        //println("the final score is: "+tour.value.cost)
         
     }
 }    

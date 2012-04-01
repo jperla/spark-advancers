@@ -20,8 +20,9 @@ object WeakSharedTestPi {
       val x = random * 2 - 1
       val y = random * 2 - 1
       if (x*x + y*y < 1) {count += 1}
-        /* 
-      //intln("Weak is jumping: " + WeakShared.ws.value+" count: "+i)
+         
+      //intln("Weak is jumping: " + WeakShared.ws.value+" count: "+i)
+      /*
       WeakShared.ws.monotonicUpdate(new DoubleWeakSharable(i))
       if ( i % 1000 == 0 ) {
         WeakShared.sendWeakShared(WeakShared.ws)

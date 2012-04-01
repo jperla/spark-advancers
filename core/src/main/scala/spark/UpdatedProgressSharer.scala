@@ -24,6 +24,8 @@ class UpdatedProgressMasterSenderActor(_serverUris: ArrayBuffer[(String, Int)]) 
     var serverWillSend = 0
     var serverFirstSent = 0
 
+    var mustStop = false
+
     def act() {
         val port = System.getProperty("spark.master.port").toInt
         RemoteActor.alive(port)
@@ -62,6 +64,7 @@ class UpdatedProgressMasterSenderActor(_serverUris: ArrayBuffer[(String, Int)]) 
           }
 
           if (diffsWillSend.size > 0 && port > 0) {
+            //println("diffs to send > 0!")
             // still diffs to send, and still new servers to send to
 
             // todo: jperla: this sets up and tears down a TCP connection, slow!
@@ -72,6 +75,8 @@ class UpdatedProgressMasterSenderActor(_serverUris: ArrayBuffer[(String, Int)]) 
             var slave = RemoteActor.select(Node(host, port), 'UpdatedProgressSharerSlave)
             // send all the diffs to this one server
             for(diff <- diffsWillSend.values) {
+	      
+              println("sending actual diff id: " + diff.id)
               slave ! UpdatedProgressDiffToSlave(diff)
             }
             slave = null
@@ -95,7 +100,17 @@ class UpdatedProgressMasterSenderActor(_serverUris: ArrayBuffer[(String, Int)]) 
               println("sent to all servers, done")
               diffsWillSend.clear() 
           }
+
+          if (mustStop) {
+            println("has must stop true")
+            exit()
+          }
         }
+    }
+
+    def stop() {
+      println("stop() called")
+      mustStop = true
     }
 }
 
@@ -125,6 +140,8 @@ class UpdatedProgressMasterReceiverActor(masterSenderActor: UpdatedProgressMaste
           println("Received message @ master from " + sender + " " + newVar.id + ":" + newVar)
           updateAndSendIfNeeded(newVar.id, newVar)
         case StopUpdatedProgressSharer =>
+          println("received StopUpdatedProgressSharer")
+          masterSenderActor.stop()
           reply('OK)
           exit()
       }
@@ -201,6 +218,7 @@ class UpdatedProgressSharer(isMaster: Boolean) extends Logging {
   }
 
   def sendUpdatedProgressMasterMessage[G,T](p: UpdatedProgressMasterMessage[G,T]) {
+    println("sending updated progress master message")
     masterReceiverActor ! UpdatedProgressMessageToMaster(p)
   }
   

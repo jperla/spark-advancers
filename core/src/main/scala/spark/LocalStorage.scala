@@ -18,7 +18,7 @@ object LocalRandom {
     var tempTour = randomCycle(7663, rand)
 
     var data = ArrayBuffer.empty[Array[Double]]
-    for(line <- Source.fromFile("../weakshared/ym7663.tsp").getLines()) {
+    for(line <- Source.fromFile("/home/princeton_ram/weakshared/ym7663.tsp").getLines()) {
             var city = new Array[Double](2)
             var node = line.split(' ')
             city(0) = node(1).toDouble

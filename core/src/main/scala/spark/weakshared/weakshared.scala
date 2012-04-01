@@ -39,30 +39,17 @@ class UpdatedProgress[G,T] (
   def advance (message: G) = {
     var doSend = param.updateLocalDecideSend(this, message)
     if (doSend) {
-        //println("new value to send will be " + message)
+        println("new value to send will be " + message)
         var upmm = param.makeMasterMessage(this, message)
 
         val updatedProgressSharer = SparkEnv.get.updatedProgressSharer
         updatedProgressSharer.sendUpdatedProgressMasterMessage(upmm)
-        // todo: jperla: remove below
-        //UpdatedProgressObject.sendUpdatedProgressMasterMessage(upmm)
     }
-
   }
 
   def masterAggregate (message: G) : UpdatedProgressDiff[G,T] = {
     return param.masterAggregate(this, message)
   }
-
-  /*
-  def update (term: T) {
-    var sendUpdate = updateWithoutSend(term)
-    if (sendUpdate) {
-        println("new value to send will be " + value_)
-        UpdatedProgressObject.sendUpdatedProgress(this)
-    }
-  }
-  */
 
   def updateValue (v : T) = {
     value_ = v
@@ -91,28 +78,6 @@ class UpdatedProgress[G,T] (
 
   override def toString = value_.toString
 }
-
-
-object UpdatedProgressObject {
-    var executor_callback : Executor = null
-    var executor_driver : ExecutorDriver = null
-    var task_description : TaskDescription = null
-
-    //This is wrong. Task description gets overwritten by each task running on a machine.
-    //we should fix this when we move to actors
-    def setExecutor (e: Executor, d: ExecutorDriver, t: TaskDescription) { 
-        executor_callback = e 
-        executor_driver = d
-        task_description = t
-    }
-
-    def sendUpdatedProgressMasterMessage[G,T](p: UpdatedProgressMasterMessage[G,T]){
-        executor_callback.sendUpdatedProgressMasterMessage(p, executor_driver, task_description)
-    }
-}
-
-
-
 
 
 
