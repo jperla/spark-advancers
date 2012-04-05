@@ -1,6 +1,8 @@
 *~
 *.swp
 *.iml
+*.bak
+
 .idea/
 /build/
 work/
