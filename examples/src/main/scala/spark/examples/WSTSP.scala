@@ -41,9 +41,6 @@ object TSPStateAccumulatorParam extends AccumulatorParam[TSPState] {
 
 */
 object WSTSP {
-
-
-
     def randomCycle (size: Int, rand: Random): ArrayBuffer[Int] =  {
         var randNodes = ArrayBuffer.empty[Int]
         for(i <- 0 until size) {
@@ -145,12 +142,11 @@ object WSTSP {
             var latestTour = new TSPState(shuffled, score)
             tour += latestTour
             var fromopt = score - 27603
-            //println("Score is : "+score+" difference is : "+ fromopt +" best is : "+WeakShared.ws.value)
+            println("Score is : " + score + " difference is : " + fromopt + " best is : ")// + WeakShared.ws.value)
         }
         //println("the final tour is: "+tour)
-        //println("the final score is: "+tour.value.cost)
-        
-    }
-}    
+        println("the final score is: "+tour.value.cost)
 
-    
+        sc.stop()
+    }
+}

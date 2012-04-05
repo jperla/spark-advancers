@@ -236,10 +236,9 @@ object LRProgress {
             }
         }
 
-        var alpha = 1.0/(UpdatedProgressVars.numIterations + 1)
         for(i <- 0 until UpdatedProgressVars.Z.size) { 
-            UpdatedProgressVars.Z(i) = message(i)
-            val newValue = oldVar.value.position(i) + (alpha * UpdatedProgressVars.Z(i))
+            UpdatedProgressVars.Z(i)  = UpdatedProgressVars.Z(i) + message(i)
+            val newValue = -UpdatedProgressVars.Z(i)/math.sqrt(UpdatedProgressVars.numIterations)
             change = change + math.pow((oldVar.value.position(i) -newValue),2)
             oldVar.value.position(i) = newValue
         }

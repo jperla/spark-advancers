@@ -329,6 +329,24 @@ object SparkContext {
   }
   
 
+  implicit object ArrayDoubleAccumulatorParam extends AccumulatorParam[Array[Double]] {
+    def addInPlace(t1: Array[Double], t2: Array[Double]): Array[Double] = {
+        var result = new Array[Double](t1.length)
+        for(i <- 0 to result.length){
+            result(i) = t1(i) + t2(i)
+        }
+        return result
+    }
+
+    def zero(initialValue: Array[Double]): Array[Double] = {
+        var z = new Array[Double](initialValue.length)
+        for(i <- 0 to z.length){
+            z(i) = 0
+        }
+        return z
+    }
+  }
+
 
   // TODO: Add AccumulatorParams for other types, e.g. lists and strings
 

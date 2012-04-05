@@ -223,11 +223,14 @@ class UpdatedProgressSharer(isMaster: Boolean) extends Logging {
   }
   
   def stop() {
+    println("stop everything!")
     masterReceiverActor !? StopUpdatedProgressSharer
     serverUris.clear()
     masterReceiverActor = null
 
-    slaveActor !? StopUpdatedProgressSharer
-    slaveActor = null
+    if (slaveActor != null) {
+        slaveActor !? StopUpdatedProgressSharer
+        slaveActor = null
+    }
   }
 }
