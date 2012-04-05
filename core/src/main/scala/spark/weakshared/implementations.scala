@@ -218,41 +218,45 @@ object LRProgress {
 	}
     def zero(initialValue: P) = new LRProgressUpdate(Array[Double](initialValue.position.size), false)
 
-    def masterAggregate (oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressDiff[G,P] = {
-        while (UpdatedProgressVars.Z.size < oldVar.value.position.size) {
+    def masterAggregate(oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressDiff[G,P] = {
+        var theta = oldVar
+        while (UpdatedProgressVars.Z.size < theta.value.position.size) {
             UpdatedProgressVars.Z.append(0)
         }
+        UpdatedProgressVars.numIterations += 1
 
-        var change = 0.0
 
-        if (UpdatedProgressVars.numIterations%10 == 0){
+        
             println("Z: \n")
             for (i <- 0 until UpdatedProgressVars.Z.length){
                 println(UpdatedProgressVars.Z(i))
             }
             println("\nX: \n")
-            for (i <- 0 until oldVar.value.position.length){
-                println(oldVar.value.position(i))
+            for (i <- 0 until theta.value.position.length){
+                println(theta.value.position(i))
             }
-        }
+        
 
-        for(i <- 0 until UpdatedProgressVars.Z.size) { 
+        var change = 0.0
+        for(i <- 0 until UpdatedProgressVars.Z.length) { 
             UpdatedProgressVars.Z(i)  = UpdatedProgressVars.Z(i) + message(i)
-            val newValue = -UpdatedProgressVars.Z(i)/math.sqrt(UpdatedProgressVars.numIterations)
-            change = change + math.pow((oldVar.value.position(i) -newValue),2)
-            oldVar.value.position(i) = newValue
+
+            val oldValue = theta.value.position(i)
+            val newValue = -1.0 * (UpdatedProgressVars.Z(i) / (2.0 * UpdatedProgressVars.numIterations)) // The 2 is implicit regularization
+            theta.value.position(i) = newValue
+
+            change = change + math.pow((oldValue - newValue), 2)
         }
         
         if (math.pow(change, 0.5) < eps) {
-            oldVar.value.converged = true
+            theta.value.converged = true
         } else{
-            oldVar.value.converged = false
+            theta.value.converged = false
         }
         
-        var doSend = true
-        UpdatedProgressVars.numIterations += 1
+        println(UpdatedProgressVars.numIterations)
 
-        var diff = new Diff(oldVar.id, message, oldVar.value)
+        var diff = new Diff(theta.id, message, theta.value)
         return diff
     }
 

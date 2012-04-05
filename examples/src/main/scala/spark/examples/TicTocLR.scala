@@ -50,8 +50,8 @@ object TicTocLR {
 
         val sc = new SparkContext(args(0), "TicTocLR")
         val path = args(1)
-        val slices = if (args.length > 2) args(2).toInt else 1
-        val iter = if (args.length > 3) args(3).toInt else 100000
+        val slices = if (args.length > 2) args(2).toInt else 2
+        var iter = 1
         val chunkSize = 7000
         val distFile = LRHelpers.parse(path, slices)
         
@@ -75,12 +75,7 @@ object TicTocLR {
 
        	    }
             
-            appendToFile("TTLR.log", "########################")
-                for ( j <- 0 until grad.value.length){
-                    appendToFile("TTLR.log", "grad outside: " + grad.value(j).toString)
-                }
-                appendToFile("TTLR.log", "########################")
-            
+                
  
             g = LRHelpers.regularizedGradient(grad.value, alpha, x)
             
@@ -88,10 +83,17 @@ object TicTocLR {
                 grad.value(j) = 0.0
             }
 
+        appendToFile("TTLR.log", "########################")
+                for ( j <- 0 until g.length){
+                    appendToFile("TTLR.log", "g outside: " + g(j).toString)
+                }
+                appendToFile("TTLR.log", "########################")
+
+
             var change = 0.0
            for (i <- 0 until numFeatures)
 	        {
-		        x(i) = x(i) - 1.0/iter *g(i)
+		        x(i) = x(i) + 1.0/iter *g(i)
             	change = 1.0/iter/iter * g(i) * g(i) + change
  	        }
 	        
@@ -100,13 +102,14 @@ object TicTocLR {
             if (c%1 == 0){
                 appendToFile("TTLR.log", "########################")
                 for ( j <- 0 until x.length){
-                    appendToFile("TTLR.log", x(j).toString)
+                    appendToFile("TTLR.log", "x after: " + x(j).toString)
                 }
                 appendToFile("TTLR.log", "########################")
             }
     
             if (math.sqrt(change) < epsilon) { converged = true }
             c += 1
+	    iter = iter + 1
     	}
 	    println("Final value of x: " + x)
     }

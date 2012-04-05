@@ -47,12 +47,16 @@ object LRHelpers {
         var i = 0
         
         for (iter <- 0 until num) {
-	        i = (iter + startIndex) % numExamples
+            i = (iter + startIndex) % numExamples
             val scale = (f(i)(0) - sigmoid(f(i), params))
-            for (l <- 1 until f(i).length) {
+            for (l <- 1 until f(i).length) {            
             	g(l-1) = g(l-1) + scale * f(i)(l)   
-	        }
-       	}            
+	    }
+            if (iter == 0)
+            {
+                TicTocLR.appendToFile("TTLR.log", "first gradient: " + g(0) + "," + g(1))
+       	    }
+        }
 	    return g
      }
 
@@ -79,12 +83,11 @@ object AsymUPConvex {
 
         val sc = new SparkContext(args(0), "AsymUPConvex")
         val path = args(1)
-        val slices = if (args.length > 2) args(2).toInt else 2
-        val iter = if (args.length > 3) args(3).toInt else 100000
+        val slices = if (args.length > 2) args(2).toInt else 1
         
-        val chunkSize = 7000
+        val chunkSize = 1000
         val distFile = LRHelpers.parse(path, slices)
-        val alpha = 0.1
+        val alpha = 0.0
    
         var buf = new Array[Double](distFile(0)(0).length - 1)
         var x = sc.updatedProgress(new LRProgressUpdate(buf, false), LRProgress.Modifier)        
@@ -96,15 +99,26 @@ object AsymUPConvex {
             while (!x.value.converged) {
                 //Note: synchronize
                 // Is this needed?
-		        for (k <- 0 until cloneX.length) {
+	        for (k <- 0 until cloneX.length) {
                     cloneX(k) = x.value.position(k)
                 }                		
 
-                var g = LRHelpers.gradient(f, cloneX, startIndex, chunkSize, alpha)
-		        startIndex = (startIndex + chunkSize) % f(0).length 
-                                
-                x.advance(g)
+                var g = LRHelpers.exampleGradient(f, cloneX, startIndex, chunkSize)
+		        startIndex = (startIndex + chunkSize) % f(0).length
 
+		for (j <- 0 until g.length) {
+		    g(j) = -g(j)
+		} 
+                                
+		
+		TicTocLR.appendToFile("TTLR.log", "########################")
+                for ( j <- 0 until g.length){
+                    TicTocLR.appendToFile("TTLR.log", "g outside: " + g(j).toString)
+                }
+                TicTocLR.appendToFile("TTLR.log", "########################")
+		
+                x.advance(g)
+		Thread.sleep(4000)
        		}
         }
         println("Final value of x: ", x.value)
