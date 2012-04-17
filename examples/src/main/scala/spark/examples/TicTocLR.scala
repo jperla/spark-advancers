@@ -4,7 +4,7 @@ import spark._
 import scala.io.Source
 import scala.collection.mutable._
 import java.io._
-
+import java.util._
 
 object ArrayDoubleAccumulatorParam extends AccumulatorParam[Array[Double]] {
     def addInPlace(t1: Array[Double], t2: Array[Double]): Array[Double] = {
@@ -61,44 +61,44 @@ object TicTocLR {
         var x = new Array[Double](numFeatures)
         var g = Array[Double](numFeatures)
         val grad = sc.accumulator(buf)(ArrayDoubleAccumulatorParam)
-        val alpha = 0.0
+        val alpha = 1.0
         val epsilon = 0.001
         var converged = false
         var c = 0
 
+        val start = System.currentTimeMillis()
         while(!converged) 
 	    {  
             for (f <- sc.parallelize(distFile, slices)) 
 	        {
                 val numExamples = f.length
 	            grad += LRHelpers.exampleGradient(f, x, 0, numExamples)
-
        	    }
             
-                
- 
             g = LRHelpers.regularizedGradient(grad.value, alpha, x)
             
             for ( j <- 0 until grad.value.length){
                 grad.value(j) = 0.0
             }
 
-        appendToFile("TTLR.log", "########################")
-                for ( j <- 0 until g.length){
-                    appendToFile("TTLR.log", "g outside: " + g(j).toString)
-                }
-                appendToFile("TTLR.log", "########################")
-
+/*
+            appendToFile("TTLR.log", "########################")
+            for ( j <- 0 until g.length){
+                appendToFile("TTLR.log", "g outside: " + g(j).toString)
+            }
+            appendToFile("TTLR.log", "########################")
+*/
 
             var change = 0.0
-           for (i <- 0 until numFeatures)
+            for (i <- 0 until numFeatures)
 	        {
 		        x(i) = x(i) + 1.0/iter *g(i)
             	change = 1.0/iter/iter * g(i) * g(i) + change
  	        }
 	        
             appendToFile("TTLR.log", change.toString)
-            
+
+/*
             if (c%1 == 0){
                 appendToFile("TTLR.log", "########################")
                 for ( j <- 0 until x.length){
@@ -106,12 +106,24 @@ object TicTocLR {
                 }
                 appendToFile("TTLR.log", "########################")
             }
-    
+*/    
             if (math.sqrt(change) < epsilon) { converged = true }
             c += 1
-	    iter = iter + 1
+	        iter = iter + 1
     	}
-	    println("Final value of x: " + x)
+
+        val stop = System.currentTimeMillis()
+        println ("Job length: " + ((stop - start)/1000).toString + " seconds")
+
+        println("#########################")
+	    println("Final value of x: ")
+        for ( j <- 0 until x.length){
+            println(x(j).toString)
+        }
+        println()
+        println("########################")
+
+	    sc.stop()
     }
 }
 
