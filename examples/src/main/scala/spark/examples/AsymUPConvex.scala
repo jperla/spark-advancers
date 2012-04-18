@@ -3,7 +3,8 @@ package spark
 import spark._
 import scala.io.Source
 import scala.collection.mutable._
-import java.util._
+import scala.util.Random
+import java.util.Date
 
 object LRHelpers {
     
@@ -30,6 +31,13 @@ object LRHelpers {
 	        }
 	    }         
 	    return retval
+    }
+
+    def getNumExamples(path: String):Int = {
+        val source = Source.fromFile(path)
+        val lines = source.mkString.split("\n")
+        source.close()
+        return lines.length
     }
 
     def sigmoid(features: Array[Double], params: Array[Double]):Double = {
@@ -78,7 +86,9 @@ object LRHelpers {
      }
 }
 
+
 object AsymUPConvex {
+    
     def main(args: Array[String]) {
         if (args.length < 2) {
             System.err.println("Usage: AsymUPConvex <host> <input> <slices> <numIter>")
@@ -88,36 +98,41 @@ object AsymUPConvex {
         val sc = new SparkContext(args(0), "AsymUPConvex")
         val path = args(1)
         val slices = if (args.length > 2) args(2).toInt else 1
-        
-        val chunkSize = 1000
+        val iter = if (args.length > 3) args(3).toInt else 10000
+
+        val chunkSize = 500
         val distFile = LRHelpers.parse(path, slices)
-        val alpha = 0.0
-   
+        val numExamples = LRHelpers.getNumExamples(path)
+        val alpha = 0.1
         var buf = new Array[Double](distFile(0)(0).length - 1)
-        var x = sc.updatedProgress(new LRProgressUpdate(buf, false), LRProgress.Modifier)        
-    
-        val start = System.currentTimeMillis()
+        val tic = new Date().getTime()
+        var x = sc.updatedProgress(new LRProgressUpdate(buf, false, 0, tic), LRProgress.Modifier)        
+        val runtime = 1000
+
         for (f <- sc.parallelize(distFile, slices)) {
             
             var cloneX = new Array[Double](f(0).length -1)
-	        var startIndex = 0
-            while (!x.value.converged) {
+            val rand = new Random(new Date().getTime())
+            var startIndex = rand.nextInt(f.length)
+            var check = new Date().getTime()
+
+            while (!x.value.converged && ((check - tic)/1000 < runtime)) {
                 //Note: synchronize
                 // Is this needed?
 	            for (k <- 0 until cloneX.length) {
                     cloneX(k) = x.value.position(k)
                 }                		
 
-		        //TicTocLR.appendToFile("TTLR.log", "start_index: " + startIndex)
-                
                 var g = LRHelpers.exampleGradient(f, cloneX, startIndex, chunkSize)
-	    	    startIndex = (startIndex + chunkSize) % f.length
 
-		        for (j <- 0 until g.length) {
-		            g(j) = -g(j)
-		        } 
-                                
-		        /*
+		        // Need to negate g because it's phrased as a minimization problem
+                for (i <- 0 until g.length) {
+                    g(i) = numExamples * -g(i)/chunkSize
+                }
+
+                startIndex = rand.nextInt(f.length)
+		        
+                /*
 		        TicTocLR.appendToFile("TTLR.log", "########################")
                 for ( j <- 0 until g.length){
                     TicTocLR.appendToFile("TTLR.log", "g outside: " + g(j).toString)
@@ -125,16 +140,19 @@ object AsymUPConvex {
                 TicTocLR.appendToFile("TTLR.log", "########################")
 		        */
 
-                x.advance(g)
+                val iteration = x.value.iter
+                val gm = new GradientMessage(g, iteration)
+                x.advance(gm)
+                check = new Date().getTime()
        		}
         }
-        
-        val stop = System.currentTimeMillis()
-        println ("Job length: " + ((stop - start)/1000).toString + " seconds")
-
-        println("#########################")
-        println("Final value of x: " + x.value)
-        println("#########################")
+       
+        val toc = new Date().getTime()
+        TicTocLR.appendToFile("ALR.log", "AsymUpConvex Running Time: " + ((toc - tic)/1000).toString)
+        for (k <- 0 until (distFile(0)(0).length - 1)) {
+            TicTocLR.appendToFile ("ALR.log", x.value.position(k).toString)
+        }
         sc.stop()
+
     }
 }

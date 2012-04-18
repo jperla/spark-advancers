@@ -39,7 +39,7 @@ class UpdatedProgress[G,T] (
   def advance (message: G) = {
     var doSend = param.updateLocalDecideSend(this, message)
     if (doSend) {
-        println("new value to send will be " + message)
+        //println("new value to send will be " + message)
         var upmm = param.makeMasterMessage(this, message)
 
         val updatedProgressSharer = SparkEnv.get.updatedProgressSharer

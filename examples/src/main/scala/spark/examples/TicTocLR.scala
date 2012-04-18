@@ -64,9 +64,10 @@ object TicTocLR {
         val alpha = 1.0
         val epsilon = 0.0001
         var converged = false
-        var c = 0
+        var c = 1
         val tic = new Date().getTime()
         var period = new Date().getTime()
+        val runtime = 1000
 
         while(!converged) 
 	    {  
@@ -103,17 +104,17 @@ object TicTocLR {
             if ((check - period)/1000 >= 10){
 
                 val timex = (check - tic)/1000
-                appendToFile("TTLRchange.log", timex.toString + "," + change.toString)
-                var xstring = ""
-                for ( j <- 0 until x.length){
+                appendToFile("TTLRchange.log", change.toString)
+                var xstring = x(0).toString
+                for ( j <- 1 until x.length){
                     xstring += ("," + x(j).toString)
                 }
-                appendToFile("TTLRparam.log", timex.toString + xstring)
+                appendToFile("TTLRparam.log", xstring)
 
                 period = new Date().getTime()
             }
             
-            if (math.sqrt(change) < epsilon || ((check - tic)/1000 >= 1000)) { converged = true }
+            if (math.sqrt(change) < epsilon || ((check - tic)/1000 > runtime)) { converged = true }
             c += 1
     	}
 
