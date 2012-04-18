@@ -59,7 +59,7 @@ class UpdatedProgressMasterSenderActor(_serverUris: ArrayBuffer[(String, Int)]) 
               val pair = serverUris(serverWillSend)
               host = pair._1
               port = pair._2
-              println("sending to server " + serverWillSend + " @ " + host + ":" + port)
+              //println("sending to server " + serverWillSend + " @ " + host + ":" + port)
             }
           }
 

@@ -3,6 +3,7 @@ package spark
 import spark._
 import scala.io.Source
 import scala.collection.mutable._
+import java.util._
 
 object LRHelpers {
     
@@ -40,8 +41,8 @@ object LRHelpers {
     }
 
     def exampleGradient(f: Array[Array[Double]], params: Array[Double], startIndex: Integer, num: Integer) : Array[Double] = {
-        var numFeatures = f(0).length - 1;
-	    var numExamples = f.length 
+        val numFeatures = f(0).length - 1;
+	    val numExamples = f.length 
 
 	    var g = new Array[Double](numFeatures)
         var i = 0
@@ -51,11 +52,14 @@ object LRHelpers {
             val scale = (f(i)(0) - sigmoid(f(i), params))
             for (l <- 1 until f(i).length) {            
             	g(l-1) = g(l-1) + scale * f(i)(l)   
-	    }
+	        }
+            
+            /*
             if (iter == 0)
             {
                 TicTocLR.appendToFile("TTLR.log", "first gradient: " + g(0) + "," + g(1))
        	    }
+            */
         }
 	    return g
      }
@@ -92,6 +96,7 @@ object AsymUPConvex {
         var buf = new Array[Double](distFile(0)(0).length - 1)
         var x = sc.updatedProgress(new LRProgressUpdate(buf, false), LRProgress.Modifier)        
     
+        val start = System.currentTimeMillis()
         for (f <- sc.parallelize(distFile, slices)) {
             
             var cloneX = new Array[Double](f(0).length -1)
@@ -99,28 +104,37 @@ object AsymUPConvex {
             while (!x.value.converged) {
                 //Note: synchronize
                 // Is this needed?
-	        for (k <- 0 until cloneX.length) {
+	            for (k <- 0 until cloneX.length) {
                     cloneX(k) = x.value.position(k)
                 }                		
 
+		        //TicTocLR.appendToFile("TTLR.log", "start_index: " + startIndex)
+                
                 var g = LRHelpers.exampleGradient(f, cloneX, startIndex, chunkSize)
-		        startIndex = (startIndex + chunkSize) % f(0).length
+	    	    startIndex = (startIndex + chunkSize) % f.length
 
-		for (j <- 0 until g.length) {
-		    g(j) = -g(j)
-		} 
+		        for (j <- 0 until g.length) {
+		            g(j) = -g(j)
+		        } 
                                 
-		
-		TicTocLR.appendToFile("TTLR.log", "########################")
+		        /*
+		        TicTocLR.appendToFile("TTLR.log", "########################")
                 for ( j <- 0 until g.length){
                     TicTocLR.appendToFile("TTLR.log", "g outside: " + g(j).toString)
                 }
                 TicTocLR.appendToFile("TTLR.log", "########################")
-		
+		        */
+
                 x.advance(g)
-		Thread.sleep(4000)
        		}
         }
-        println("Final value of x: ", x.value)
+        
+        val stop = System.currentTimeMillis()
+        println ("Job length: " + ((stop - start)/1000).toString + " seconds")
+
+        println("#########################")
+        println("Final value of x: " + x.value)
+        println("#########################")
+        sc.stop()
     }
 }

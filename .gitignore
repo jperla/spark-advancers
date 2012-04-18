@@ -2,6 +2,7 @@
 *.swp
 *.iml
 *.bak
+*#
 
 .idea/
 /build/

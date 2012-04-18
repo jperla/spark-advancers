@@ -58,17 +58,6 @@ class Executor extends org.apache.mesos.Executor with Logging {
     threadPool.execute(new TaskRunner(task, d))
   }
 
-  def sendUpdatedProgressMasterMessage[G,T](p: UpdatedProgressMasterMessage[G,T], d: ExecutorDriver, t: TaskDescription) 
-  {
-    var updates = scala.collection.mutable.Map[Long, Any]()
-    updates(p.id) = p
-    d.sendStatusUpdate(TaskStatus.newBuilder()
-                        .setTaskId(t.getTaskId)
-                        .setState(TaskState.TASK_RUNNING)
-                        .setData(ByteString.copyFrom(Utils.serialize(updates)))
-                        .build())
-  }
-
   class TaskRunner(desc: TaskDescription, d: ExecutorDriver)
   extends Runnable {
     override def run() = {
