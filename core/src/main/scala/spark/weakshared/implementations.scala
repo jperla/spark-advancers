@@ -293,7 +293,7 @@ object LRProgress {
         }
        
         var check = (new Date().getTime() - oldVar.value.time)/1000
-        if (check >= 10)
+        if (check >= 1)
         {
             oldVar.value.time = new Date().getTime()
             Log.appendToFile("ALRchange.log", change.toString)

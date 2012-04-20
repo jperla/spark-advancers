@@ -43,7 +43,7 @@ object LRHelpers {
     def sigmoid(features: Array[Double], params: Array[Double]):Double = {
         var sum = 0.0
         for (i <- 0 until params.length){
-            sum = sum - features(i+1)*params(i)
+            sum = sum - features(i+1) * params(i)
         }
         return 1/(1 + math.exp(sum))
     }
@@ -100,14 +100,14 @@ object AsymUPConvex {
         val slices = if (args.length > 2) args(2).toInt else 1
         val iter = if (args.length > 3) args(3).toInt else 10000
 
-        val chunkSize = 500
+        val chunkSize = 200
         val distFile = LRHelpers.parse(path, slices)
         val numExamples = LRHelpers.getNumExamples(path)
         val alpha = 0.1
         var buf = new Array[Double](distFile(0)(0).length - 1)
         val tic = new Date().getTime()
         var x = sc.updatedProgress(new LRProgressUpdate(buf, false, 0, tic), LRProgress.Modifier)        
-        val runtime = 1000
+        val runtime = 500
 
         for (f <- sc.parallelize(distFile, slices)) {
             
