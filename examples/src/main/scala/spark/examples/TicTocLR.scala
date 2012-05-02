@@ -69,6 +69,7 @@ object TicTocLR {
         var period = new Date().getTime()
         val runtime = 500
 
+        val start = System.currentTimeMillis()
         while(!converged) 
 	    {  
             for (f <- sc.parallelize(distFile, slices)) 
@@ -122,8 +123,7 @@ object TicTocLR {
         for ( j <- 0 until x.length){
             appendToFile("TTLR.log", x(j).toString)
         }
-
-	    sc.stop()
+	sc.stop()
     }
 }
 

@@ -105,6 +105,7 @@ object AsymUPConvex {
         val numExamples = LRHelpers.getNumExamples(path)
         val alpha = 0.1
         var buf = new Array[Double](distFile(0)(0).length - 1)
+
         val tic = new Date().getTime()
         var x = sc.updatedProgress(new LRProgressUpdate(buf, false, 0, tic), LRProgress.Modifier)        
         val runtime = 500
@@ -123,23 +124,17 @@ object AsymUPConvex {
                     cloneX(k) = x.value.position(k)
                 }                		
 
+	        //TicTocLR.appendToFile("TTLR.log", "start_index: " + startIndex)
+                
                 var g = LRHelpers.exampleGradient(f, cloneX, startIndex, chunkSize)
 
-		        // Need to negate g because it's phrased as a minimization problem
+		// Need to negate g because it's phrased as a minimization problem
                 for (i <- 0 until g.length) {
                     g(i) = numExamples * -g(i)/chunkSize
                 }
 
                 startIndex = rand.nextInt(f.length)
 		        
-                /*
-		        TicTocLR.appendToFile("TTLR.log", "########################")
-                for ( j <- 0 until g.length){
-                    TicTocLR.appendToFile("TTLR.log", "g outside: " + g(j).toString)
-                }
-                TicTocLR.appendToFile("TTLR.log", "########################")
-		        */
-
                 val iteration = x.value.iter
                 val gm = new GradientMessage(g, iteration)
                 x.advance(gm)
@@ -153,6 +148,5 @@ object AsymUPConvex {
             TicTocLR.appendToFile ("ALR.log", x.value.position(k).toString)
         }
         sc.stop()
-
     }
 }
