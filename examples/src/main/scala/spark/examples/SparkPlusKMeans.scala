@@ -4,7 +4,91 @@ import java.util.Random
 import spark.SparkContext
 import spark.SparkContext._
 import spark.examples.Vector._
-import scala.collections.mutable.Map
+import scala.collection.mutable.Map
+
+
+
+import spark._
+
+
+import spark.examples.Vector._
+
+object KMeansLib {
+    def centersToString(centers: Array[(Int, Vector)]): String = {
+        var out = new String
+        for (c <- centers){
+            out = out + "N: " + c._1 + ", center: " + c._2.toString + "\n"
+        }
+        return out
+    }
+}
+
+class KMeansProgressUpdate (
+    var centers: Array[(Int, Vector)], var converged: Boolean) extends Serializable
+{
+    override def toString: String = { 
+        var out = KMeansLib.centersToString(centers)
+        out = out + "converged: " + converged.toString
+        return out
+    }
+}
+
+object KMeansProgress {
+  type G = Array[(Int, Vector)]
+  type P = KMeansProgressUpdate
+    
+    
+  class MasterMessage (
+    var id:Long, var message: G, @transient theType: P) extends UpdatedProgressMasterMessage[G,P]
+  {
+    override def toString: String = {
+        var out = new String
+        out = out + "\n" + "id: " + id.toString + "\n"
+        out = out + KMeansLib.centersToString(message)
+        return out
+    }
+  }
+
+  class Diff (
+    var id:Long, @transient message: G, @transient theType: P) extends UpdatedProgressDiff[G,P]
+  {
+    var myValue = theType
+    def update(oldVar : UpdatedProgress[G,P]) = {
+        // todo: locking?
+        oldVar.updateValue(myValue)
+    }
+
+    override def toString = "\n" + "id:" + id.toString + ":" + myValue.toString
+  }
+
+  object Modifier extends UpdatedProgressModifier[G,P] {
+    val eps = 1e-10
+
+    def updateLocalDecideSend(oldVar: UpdatedProgress[G,P], message: G) : Boolean = {
+        // always send G; no change to local state
+        return true
+	}
+
+    def zero(initialValue: P) = new KMeansProgressUpdate(new Array[(Int, Vector)](initialValue.centers.size), false)
+
+    def masterAggregate(oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressDiff[G,P] = {
+        var diff = new Diff(oldVar.id, message, oldVar.value)
+        return diff
+    }
+
+    def makeMasterMessage (oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressMasterMessage[G,P] = {
+        return new MasterMessage(oldVar.id, message, 
+            new KMeansProgressUpdate(new Array[(Int,Vector)](0), false))
+    }
+  }
+}
+
+
+
+
+
+
+
 
 object SparkPlusKMeans {
   def parseVector(line: String): Vector = {
@@ -27,31 +111,6 @@ object SparkPlusKMeans {
 
 
 
-    class KMeansState (c: Map[Int, (Array[Int], Array[Vector])] = Map.empty[Int, (Array[Int], Array[Vector])]) extends Serializable {
-        var centers = c
-        
-        override def toString(): String = {
-            var s = new String("k means centers")
-            //c.foreach(p => s += p + ", ")
-            return s
-        }
-    }
-
-    object KMeansStateAccumulatorParam extends AccumulatorParam[KMeansState] {
-        def addInPlace(t1: KMeansState, t2: KMeansState): KMeansState = {
-            for (key <- t2) {
-                t1(key) = t2(key)
-            }
-            return t1
-        }
-
-        /*Todo: this is weird. we dont touch initialValue*/
-        def zero(initialValue: KMeansState): KMeansState = { return initialValue }
-    }
-
-
-
-
   def main(args: Array[String]) {
     if (args.length < 3) {
       System.err.println("Usage: SparkPlusKMeans <master> <file> <dimensions> <k> <iters>")
@@ -70,9 +129,9 @@ object SparkPlusKMeans {
     }
     println("Initial centers: " + centers.mkString(", "))
 
-    val allcenters = sc.updatedProgress(Map.empty, KMeansProgress.Modifier)
+    val allcenters = sc.updatedProgress(new KMeansProgressUpdate(new Array[(Int,Vector)](k), false), KMeansProgress.Modifier)
 
-    for (i <- 1 to iterations) {
+    for (i <- 0 to iterations) {
       println("On iteration " + i)
 
       val lines = sc.textFile(args(1) + i + ".txt")
@@ -87,7 +146,7 @@ object SparkPlusKMeans {
         case ((sum1, count1), (sum2, count2)) => (sum1 + sum2, count1 + count2)
       }.map { 
         case (id, (sum, count)) => (id, sum / count)
-      }.collect
+      }
 
       // Update the centers array with the new centers we collected
       for ((id, value) <- newCenters) {
