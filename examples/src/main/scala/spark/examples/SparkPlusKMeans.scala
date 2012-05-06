@@ -131,10 +131,11 @@ object SparkPlusKMeans {
 
     val allcenters = sc.updatedProgress(new KMeansProgressUpdate(new Array[(Int,Vector)](k), false), KMeansProgress.Modifier)
 
-    for (i <- 0 to iterations) {
+    for (i <- 0 until iterations) {
       println("On iteration " + i)
 
-      val lines = sc.textFile(args(1) + i + ".txt")
+      val filename = args(1) + i + ".txt"
+      val lines = scala.io.Source.fromFile(filename).getLines
       val points = lines.map(parseVector _)
 
       // Map each point to the index of its closest center and a (point, 1) pair
@@ -142,15 +143,18 @@ object SparkPlusKMeans {
       val mappedPoints = points.map { p => (closestCenter(p, centers), (p, 1)) }
 
       // Compute the new centers by summing the (point, 1) pairs and taking an average
-      val newCenters = mappedPoints.reduceByKey {
-        case ((sum1, count1), (sum2, count2)) => (sum1 + sum2, count1 + count2)
-      }.map { 
-        case (id, (sum, count)) => (id, sum / count)
+
+      var initial = centers.map{_ => (0, Vector(dimensions, 0))}
+      val newCenters = mappedPoints.foldLeft(initial) {
+        //case ((sum1, count1), (sum2, count2)) => (sum1 + sum2, count1 + count2)
+        case (c, (id, (sum, count))) => c.update(id, (c(id)._1 + count, c(id)._2 + sum)); c;
+      }.map {
+        case (count, sum) => (count, sum / count)
       }
 
       // Update the centers array with the new centers we collected
-      for ((id, value) <- newCenters) {
-        centers(id) = value
+      for ((value, id) <- newCenters.zipWithIndex) {
+        centers(id) = value._2
       }
     }
 
