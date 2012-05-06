@@ -25,7 +25,6 @@ class TopicWordDistribution(val num_topics: Int, val num_words: Int) {
       // Initatializes each row to a random draw from a dirichlet with parameter eta
       // TODO: Currently assumes the parameter vector has all the same entries
       def random_init(eta: Double) {
-      	  // Does stick breaking
 	  var rng = new RandomDataImpl()
 	  for (t <- 0 until num_topics) {
 	      var sum = 0.0
@@ -39,14 +38,22 @@ class TopicWordDistribution(val num_topics: Int, val num_words: Int) {
 	      	  dist(t)(i) = dist(t)(i) / sum
 	      }
 	      
-	   }	  
+	   }
+      }
+
+      def unif_init() {
+      	  for (t <- 0 until num_topics) {
+	      for (i <- 0 until num_words) {
+	      	  dist(t)(i) = 1.0 / num_words
+	      }
+	   }
       }
 
       override def toString() : String  = {
 	  var result = ""
-	  for (t <- 0 to num_topics) {
+	  for (t <- 0 until num_topics) {
 	      var line = ""
-	      for (w <- 0 to num_words) {
+	      for (w <- 0 until num_words) {
 	      	  line = line + dist(t)(w) + ","
 	      }
 	      result = result + line.substring(0, line.length - 1) + "\n"
@@ -61,6 +68,14 @@ class TopicESStats(val num_topics: Int, val num_words: Int) {
       for (i <- 0 until num_topics) {
       	  stats(i) = new Array[Double](num_words)
       }
+
+      def clear() {
+      	  for (i <- 0 until num_topics) {
+	      for (j <- 0 until num_words) {
+	      	  stats(i)(j) = 0
+	      }
+	  }
+      }
 }
 
 class ExpELogBeta(val num_topics: Int, val num_words: Int) {
@@ -71,22 +86,41 @@ class ExpELogBeta(val num_topics: Int, val num_words: Int) {
 }
 
 object LDAHelpers {
+
+       def string_2d_array(x: Array[Array[Double]]) : String = {
+       	   var ret = ""
+	   for (row <- x) {
+	       var line = ""
+	       for (col <- row) {
+	       	   line = line + col.toString + ","
+	       }
+	       ret = ret + "\n" +  line
+	   }
+	   return ret
+       }
        
        // TODO: set eta
        def update_topic_word_dist(twd: TopicWordDistribution, sstats: TopicESStats, num_iter: Int,
        	   			  num_docs: Int, batch_size: Int, eta: Double) {
        	   var rho_t = 1.0 / num_iter
+	   println("Start sttats")
 	   for (t <- 0 until twd.num_topics) {
+	       println(sstats.stats(t)(1))
 	       for (w <- 0 until twd.num_words) {
-	       	   twd.dist(t)(w) = (1 - rho_t) * twd.dist(t)(w) + rho_t * (eta + num_docs * sstats.stats(t)(w) / batch_size)
+	       	   val update = (eta + num_docs * sstats.stats(t)(w) / batch_size) 
+	       	   twd.dist(t)(w) = (1 - rho_t) * twd.dist(t)(w) + rho_t * update
+
 	       }
 	   }
+
+	   println("lambda: "); println(string_2d_array(twd.dist))
        }
 
-       def update_e_log_beta(twd: TopicWordDistribution, e_log_beta: ExpELogBeta) {
-       	   for (t <- 0 until twd.num_topics) {
+       def update_e_log_beta(twd: TopicWordDistribution, e_log_beta: ExpELogBeta) {       	   
+	   for (t <- 0 until twd.num_topics) {
 	       e_log_beta.value(t) = elem_exp(dirichlet_expectation(twd.dist(t)))
 	   }
+	   print("beta: "); println(e_log_beta.value(0)(0))
        }
 
        def sstats(documents: Array[Document], twd: TopicWordDistribution, expElogbeta: ExpELogBeta,  
@@ -109,11 +143,37 @@ object LDAHelpers {
 	       var exit = false
 	       var iter = 0
 
+	       println("Beta")
+	       for (row <- expElogbeta.value) {
+	       	   var line = ""
+		   for (col <- row) {
+		       line = line + col.toString + ","
+		   }
+		   println(line)
+	       }
+
 	       // Technically this should be until convergence, but good progress can be made in a fixed number of iterations
 	       while (iter < 100 && !exit) {
 	       	   // RAJESH: This needs to be a deep copy
 	       	   var lastgamma = gammad
 
+		   print("gammad " + iter.toString + " : ")
+	       	   for (g <- gammad) {
+	       	       print(g); print(", ")
+	       	   }
+	       	   println("")
+		   print("phi_norm: "); 
+		   for (p <- phi_norm) {
+		       print(p); print(", ")
+		   }
+		   println("")
+		   
+		   print("expElogthetad: "); 
+		   for (g <- expElogthetad) {
+		           print(g); print(", ")
+		   }
+		   println("")
+  
 		   // RAJESH: DEFINE ALPHA!!!
 		   gammad = increment(alpha, vec_element_wise_product(expElogthetad, gamma_count_update(doc, phi_norm, expElogbeta)))
 		   Elogtheta = dirichlet_expectation(gammad)
@@ -126,17 +186,53 @@ object LDAHelpers {
 		   }
 		   iter = iter + 1
 	       }
+
+	       print("gammad: ")
+	       for (g <- gammad) {
+	       	   print(g); print(", ")
+	       }
+	       println("")
+
+	        println("")
+		   print("phi_norm: "); 
+		   for (p <- phi_norm) {
+		       print(p); print(", ")
+		   }
+		   println("")
+		   
+		   print("expElogthetad: "); 
+		   for (g <- expElogthetad) {
+		           print(g); print(", ")
+		   }
+		   println("")
+	       
 	       update_sstats(sstats, expElogthetad, doc, phi_norm)
+	       println("Update sstats")
+	       for (row <- sstats.stats) {
+	       	   var line = ""
+		   for (col <- row) {
+		       line = line + col.toString + ","
+		   }
+		   println(line)
+	       }
 	   }
 
 	  final_sstats(sstats, expElogbeta)
+	  println("Final sstats")
+	       for (row <- sstats.stats) {
+	       	   var line = ""
+		   for (col <- row) {
+		       line = line + col.toString + ","
+		   }
+		   println(line)
+	       }
        }
 
        def update_sstats(sstats: TopicESStats, expElogthetad: Array[Double], doc: Document, phi_norm: Array[Double]) {
-       	   for (t <- 0 until sstats.num_topics) {
+	   for (t <- 0 until sstats.num_topics) {
 	       for (i <- 0 until  doc.counts.size()) {
-	       	   val index = doc.ids.get(i)
-		   sstats.stats(t)(i) = sstats.stats(t)(i) + expElogthetad(t) * doc.counts.get(i) / phi_norm(i)  
+		   val index = doc.ids.get(i)
+		   sstats.stats(t)(index) = sstats.stats(t)(index) + expElogthetad(t) * doc.counts.get(i) / phi_norm(i)  
 	       }
 	   }
        }
@@ -171,15 +267,20 @@ object LDAHelpers {
 	   for (t <- 0 until e_log_beta.num_topics) {
 	       for (i <- 0 until doc.ids.size()) {
 	       	   val index = doc.ids.get(i)
-		   retval(t) = retval(t) + doc.counts.get(t) / phi_norm(t) * e_log_beta.value(t)(index)
+		   retval(t) = retval(t) + doc.counts.get(i) / phi_norm(i) * e_log_beta.value(t)(index)
 	       }
 	   }
+	   print("Gamma count update: ")
+	   for (g <- retval) {
+	       print(g); print(", ")
+	   }
+	   println("")
 	   return retval
        }
 
        // Increments an each element of x in-place, returns x as convenience
        def increment(increment: Double, x: Array[Double]) : Array[Double] = {
-       	   for (i <- 0 until x.length) {
+	   for (i <- 0 until x.length) {
 	       x(i) = x(i) + increment
 	   }
 	   return x
@@ -203,10 +304,12 @@ object LDAHelpers {
 	   for (i <- 0 until ids.size()) {
 	       val index = ids.get(i)
 	       var inner_product = 0.0
-	       for (j <- 0 until expElogbeta.num_topics) {
-	       	   inner_product = inner_product + expElogbeta.value(index)(j) * expElogthetad(j)
+	       for (t <- 0 until expElogbeta.num_topics) {
+	       	   inner_product = inner_product + expElogbeta.value(t)(index) * expElogthetad(t)
 	       }
+	       retval(i) = inner_product + 1e-70
 	   }
+	   	   
 	   return retval
        }
 
@@ -221,7 +324,7 @@ object LDAHelpers {
 
        // Computes the sum of x
        def sum(x: Array[Double]) : Double = {
-       	   var retval = 0.0
+	   var retval = 0.0
 	   for (i <- 0 until x.length) {
 	       retval = retval + x(i)
 	   }
@@ -244,13 +347,14 @@ object OnlineLDADataReader {
 	   var documents = new Array[Document](get_num_documents(doc_path))
 	   var index = 0
 	   for (line <- scala.io.Source.fromFile(new File(doc_path)).getLines()) {
+	       documents(index) = new Document()
 	       val tokens = line.split(" ");
-	       for (i <- 1 to tokens.length) {
+	       for (i <- 1 until tokens.length) {
 	       	   val id_count_pair = tokens(i).split(":")
 		   documents(index).ids.add(id_count_pair(0).toInt)
 		   documents(index).counts.add(id_count_pair(1).toInt)
 	       }	   
-	       index = index + 1;
+	       index = index + 1
 	   }
 	   return documents
        }
@@ -278,31 +382,35 @@ object OnlineLDA {
 	val num_topics = args(3).toInt
         val slices = if (args.length > 2) args(4).toInt else 1
 
-        val chunk_size = 200
-	val alpha = .5
-	val eta = .5
+        val chunk_size = 1
+	val alpha = 1.0 / num_topics
+	val eta = 1.0 / num_topics
     	
 	var twd = new TopicWordDistribution(num_topics, num_words)
-	twd.random_init(eta)
+	twd.unif_init()
 	var exp_e_log_beta = new ExpELogBeta(num_topics, num_words)
 	LDAHelpers.update_e_log_beta(twd, exp_e_log_beta);
 	var sstats = new TopicESStats(num_topics, num_words) 
 	
-	val documents = OnlineLDADataReader.read(path, 1)
-	val converged = false
+	val documents = OnlineLDADataReader.read(path, 0)
+	var converged = false
+	var go = true
 	var iter = 1
 
 	val rand = new Random(new Date().getTime())	
 	val start = new Date().getTime()
 	var time = start
-        val runtime = 500
+        val runtime = 50
 
-	while (!converged && ((time - start) / 1000 < runtime)) {
-	      var start_index = rand.nextInt(documents.length)
+	while (go) {
+	      var start_index = 0 //rand.nextInt(documents.length)
 	      LDAHelpers.sstats(documents, twd, exp_e_log_beta, start_index, chunk_size, sstats, alpha)
 	      LDAHelpers.update_topic_word_dist(twd, sstats, iter, documents.length, chunk_size, eta)
+	      sstats.clear()
 	      LDAHelpers.update_e_log_beta(twd, exp_e_log_beta);
 	      var time = new Date().getTime()
+	      go = !converged && ((time - start) / 1000 < runtime) && (iter < 100)
+	      print("Rajesh"); println(go)
 	      iter = iter + 1
 	}
 	// Write out the topics to file      	
