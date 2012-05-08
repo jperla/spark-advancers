@@ -113,51 +113,54 @@ object SparkPlusKMeans {
 
   def main(args: Array[String]) {
     if (args.length < 3) {
-      System.err.println("Usage: SparkPlusKMeans <master> <file> <dimensions> <k> <iters>")
+      System.err.println("Usage: SparkPlusKMeans <master> <slices> <dimensions> <k> <iters> <file>")
       System.exit(1)
     }
     val sc = new SparkContext(args(0), "SparkKMeans")
+    val slices = args(2).toInt
     val dimensions = args(2).toInt
     val k = args(3).toInt
     val iterations = args(4).toInt
 
     // Initialize cluster centers randomly
     val rand = new Random(42)
-    var centers = new Array[Vector](k)
+    var initialCenters = new Array[(Int, Vector)](k)
     for (i <- 0 until k) {
-      centers(i) = Vector(dimensions, _ => 2 * rand.nextDouble - 1)
+      initialCenters(i) = (0, Vector(dimensions, _ => 2 * rand.nextDouble - 1))
     }
-    println("Initial centers: " + centers.mkString(", "))
+    println("Initial centers: " + initialCenters.mkString(", "))
 
-    val allcenters = sc.updatedProgress(new KMeansProgressUpdate(new Array[(Int,Vector)](k), false), KMeansProgress.Modifier)
+    //val allcenters = sc.updatedProgress(new KMeansProgressUpdate(new Array[(Int,Vector)](k), false), KMeansProgress.Modifier)
+    val zero = new KMeansProgressUpdate(initialCenters, false)
+    val allcenters = sc.updatedProgress(zero, KMeansProgress.Modifier)
 
-    for (i <- 0 until iterations) {
+    for (i <- sc.parallelize(0 until iterations, slices)) {
       println("On iteration " + i)
 
-      val filename = args(1) + i + ".txt"
+      val filename = args(5) + i + ".txt"
       val lines = scala.io.Source.fromFile(filename).getLines
       val points = lines.map(parseVector _)
 
+      val centers = allcenters.value.centers
+
       // Map each point to the index of its closest center and a (point, 1) pair
       // that we will use to compute an average later
-      val mappedPoints = points.map { p => (closestCenter(p, centers), (p, 1)) }
+      val mappedPoints = points.map { p => (closestCenter(p, centers.map{case (a,b) => b}), (p, 1)) }
 
       // Compute the new centers by summing the (point, 1) pairs and taking an average
 
       var initial = centers.map{_ => (0, Vector(dimensions, 0))}
       val newCenters = mappedPoints.foldLeft(initial) {
-        //case ((sum1, count1), (sum2, count2)) => (sum1 + sum2, count1 + count2)
-        case (c, (id, (sum, count))) => c.update(id, (c(id)._1 + count, c(id)._2 + sum)); c;
+        // reduceByKey; vsum == vectorSum .
+        case (c, (id, (vsum, count))) => c.update(id, (c(id)._1 + count, c(id)._2 + vsum)); c;
       }.map {
-        case (count, sum) => (count, sum / count)
+        case (count, vsum) => (count, vsum / count)
       }
 
       // Update the centers array with the new centers we collected
-      for ((value, id) <- newCenters.zipWithIndex) {
-        centers(id) = value._2
-      }
+      allcenters.advance(newCenters)
     }
 
-    println("Final centers: " + centers.mkString(", "))
+    println("Final centers: " + allcenters.value.centers.mkString(", "))
   }
 }
