@@ -5,13 +5,37 @@ import spark.SparkContext
 import spark.SparkContext._
 import spark.examples.Vector._
 import scala.collection.mutable.Map
-
+import scala.collection.mutable.HashMap
 
 
 import spark._
 
 
 import spark.examples.Vector._
+
+
+object LocalData {
+  var centers = null : Map[Int, Array[(Int, Vector)]]
+  var k = 0
+
+  def mergeCenters(allcenters: Map[Int, Array[(Int, Vector)]]) : Array[(Int, Vector)] = {
+    val k = LocalData.k
+    // average up the centers in local storage
+    var initial = new Array[(Int, Vector)](k)
+    for (i <- 0 until k) {
+        //#TODO: jperla: don't hardcode 2
+        initial(i) = (0, Vector(2, _ => 0))
+    }
+
+    return allcenters.foldLeft(initial) {
+        case (c, (chunk, centers)) => c.zip(centers).map{ case (a,b) => (a._1 + b._1, (b._2 * b._1) + a._2) }
+    }.map {
+        case (count, sum) => if (count > 0) { (count, sum / count) } else { (0, sum) }
+    }
+  }
+}
+
+
 
 object KMeansLib {
     def centersToString(centers: Array[(Int, Vector)]): String = {
@@ -28,15 +52,26 @@ class KMeansProgressUpdate (
 {
     override def toString: String = { 
         var out = KMeansLib.centersToString(centers)
-        out = out + "converged: " + converged.toString
+        out = out + " converged: " + converged.toString
         return out
     }
 }
 
+
+class KMeansMapMessage (
+    var chunk: Int, var centers: Array[(Int, Vector)]) extends Serializable
+{
+    override def toString: String = { 
+        var out = KMeansLib.centersToString(centers)
+        out = out + " chunk: " + chunk
+        return out
+    }
+}
+
+
 object KMeansProgress {
-  type G = Array[(Int, Vector)]
+  type G = KMeansMapMessage
   type P = KMeansProgressUpdate
-    
     
   class MasterMessage (
     var id:Long, var message: G, @transient theType: P) extends UpdatedProgressMasterMessage[G,P]
@@ -44,7 +79,7 @@ object KMeansProgress {
     override def toString: String = {
         var out = new String
         out = out + "\n" + "id: " + id.toString + "\n"
-        out = out + KMeansLib.centersToString(message)
+        out = out + message //old: KMeansLib.centersToString(message)
         return out
     }
   }
@@ -61,6 +96,7 @@ object KMeansProgress {
     override def toString = "\n" + "id:" + id.toString + ":" + myValue.toString
   }
 
+
   object Modifier extends UpdatedProgressModifier[G,P] {
     val eps = 1e-10
 
@@ -69,9 +105,25 @@ object KMeansProgress {
         return true
 	}
 
-    def zero(initialValue: P) = new KMeansProgressUpdate(new Array[(Int, Vector)](initialValue.centers.size), false)
+    def zero(initialValue: P) : P = { 
+        if (LocalData.centers == null) {
+            // TODO: is this right?
+            LocalData.centers = new HashMap[Int, Array[(Int, Vector)]]()
+        }
+        LocalData.k = initialValue.centers.length
+        return new KMeansProgressUpdate(initialValue.centers, false)
+    }
 
     def masterAggregate(oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressDiff[G,P] = {
+        // save message in local storage
+        LocalData.centers(message.chunk) = message.centers
+
+        val newCenters = LocalData.mergeCenters(LocalData.centers)
+
+        // save this average to oldVar
+        oldVar.updateValue(new KMeansProgressUpdate(newCenters, false))
+        //println("oldVar: " + oldVar)
+    
         var diff = new Diff(oldVar.id, message, oldVar.value)
         return diff
     }
@@ -117,7 +169,7 @@ object SparkPlusKMeans {
       System.exit(1)
     }
     val sc = new SparkContext(args(0), "SparkKMeans")
-    val slices = args(2).toInt
+    val slices = args(1).toInt
     val dimensions = args(2).toInt
     val k = args(3).toInt
     val iterations = args(4).toInt
@@ -134,33 +186,44 @@ object SparkPlusKMeans {
     val zero = new KMeansProgressUpdate(initialCenters, false)
     val allcenters = sc.updatedProgress(zero, KMeansProgress.Modifier)
 
-    for (i <- sc.parallelize(0 until iterations, slices)) {
-      println("On iteration " + i)
+    for (i <- sc.parallelize(0 until slices, slices)) {
+      println("====== On chunk " + i)
 
       val filename = args(5) + i + ".txt"
       val lines = scala.io.Source.fromFile(filename).getLines
       val points = lines.map(parseVector _)
 
-      val centers = allcenters.value.centers
+      //while (!allcenters.value.converged)
+      for (j <- 0 until iterations) {
+        val centers = allcenters.value.centers.clone()
 
-      // Map each point to the index of its closest center and a (point, 1) pair
-      // that we will use to compute an average later
-      val mappedPoints = points.map { p => (closestCenter(p, centers.map{case (a,b) => b}), (p, 1)) }
+        // Map each point to the index of its closest center and a (point, 1) pair
+        // that we will use to compute an average later
+        val mappedPoints = points.map { p => (closestCenter(p, centers.map{case (a,b) => b}), (p, 1)) }
 
-      // Compute the new centers by summing the (point, 1) pairs and taking an average
+        // Compute the new centers by summing the (point, 1) pairs and taking an average
+        var initial = centers.map{x => (0, Vector(dimensions, _ => 0))}
+        val newCenters = mappedPoints.foldLeft(initial) {
+            // reduceByKey; vsum == vectorSum .
+            case (c, (id, (vsum, count))) => c.update(id, (c(id)._1 + count, c(id)._2 + vsum)); c;
+        }.map {
+            case (count, vsum) => if (count > 0) { (count, vsum / count) } else { (0, vsum) }
+        }
 
-      var initial = centers.map{_ => (0, Vector(dimensions, 0))}
-      val newCenters = mappedPoints.foldLeft(initial) {
-        // reduceByKey; vsum == vectorSum .
-        case (c, (id, (vsum, count))) => c.update(id, (c(id)._1 + count, c(id)._2 + vsum)); c;
-      }.map {
-        case (count, vsum) => (count, vsum / count)
+        // Update the centers array with the new centers we collected
+        allcenters.advance(new KMeansMapMessage(i, newCenters))
       }
-
-      // Update the centers array with the new centers we collected
-      allcenters.advance(newCenters)
     }
 
     println("Final centers: " + allcenters.value.centers.mkString(", "))
+    val finalCenters = LocalData.mergeCenters(LocalData.centers)
+    println("Final centers: " + finalCenters.mkString(","))
+
+    println("all centers:")
+    println(LocalData.centers(0).mkString(","))
+    println(LocalData.centers(1).mkString(","))
+    println(LocalData.centers(2).mkString(","))
+    println(LocalData.centers(3).mkString(","))
+    println(LocalData.centers(4).mkString(","))
   }
 }
