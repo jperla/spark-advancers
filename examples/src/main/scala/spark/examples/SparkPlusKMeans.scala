@@ -20,6 +20,9 @@ object LocalData {
 
   def mergeCenters(allcenters: Map[Int, Array[(Int, Vector)]]) : Array[(Int, Vector)] = {
     val k = LocalData.k
+
+    println("k: " + k)
+
     // average up the centers in local storage
     var initial = new Array[(Int, Vector)](k)
     for (i <- 0 until k) {
@@ -115,17 +118,23 @@ object KMeansProgress {
     }
 
     def masterAggregate(oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressDiff[G,P] = {
-        // save message in local storage
-        LocalData.centers(message.chunk) = message.centers
+        val N = message.centers.map{ x => x._1}.reduceLeft[Int](_+_)
+        if (N > 0) {
+            // save message in local storage
+            LocalData.centers(message.chunk) = message.centers
 
-        val newCenters = LocalData.mergeCenters(LocalData.centers)
+            val newCenters = LocalData.mergeCenters(LocalData.centers)
 
-        // save this average to oldVar
-        oldVar.updateValue(new KMeansProgressUpdate(newCenters, false))
-        //println("oldVar: " + oldVar)
-    
-        var diff = new Diff(oldVar.id, message, oldVar.value)
-        return diff
+            // save this average to oldVar
+            val newVar = new KMeansProgressUpdate(newCenters, false)
+            oldVar.updateValue(newVar)
+            //println("oldVar: " + oldVar)
+        
+            var diff = new Diff(oldVar.id, message, oldVar.value)
+            return diff
+        } else {
+            return null
+        }
     }
 
     def makeMasterMessage (oldVar: UpdatedProgress[G,P], message: G) : UpdatedProgressMasterMessage[G,P] = {
@@ -190,7 +199,7 @@ object SparkPlusKMeans {
       println("====== On chunk " + i)
 
       val filename = args(5) + i + ".txt"
-      val lines = scala.io.Source.fromFile(filename).getLines
+      val lines = scala.io.Source.fromFile(filename).getLines().toArray
       val points = lines.map(parseVector _)
 
       //while (!allcenters.value.converged)
@@ -198,8 +207,14 @@ object SparkPlusKMeans {
         val centers = allcenters.value.centers.clone()
 
         // Map each point to the index of its closest center and a (point, 1) pair
+        println("Num points: " + points.length)
+        println("p1: " + points(1))
         // that we will use to compute an average later
         val mappedPoints = points.map { p => (closestCenter(p, centers.map{case (a,b) => b}), (p, 1)) }
+
+        //println(i + " currentCenters: " + KMeansLib.centersToString(centers))
+        println("Num mapped points: " + mappedPoints.length)
+        println("p1: " + mappedPoints(1))
 
         // Compute the new centers by summing the (point, 1) pairs and taking an average
         var initial = centers.map{x => (0, Vector(dimensions, _ => 0))}
@@ -210,8 +225,13 @@ object SparkPlusKMeans {
             case (count, vsum) => if (count > 0) { (count, vsum / count) } else { (0, vsum) }
         }
 
+        val m = new KMeansMapMessage(i, newCenters)
+
+        //println("new centers: " + m)
+        //println("---- finish new centers")
+
         // Update the centers array with the new centers we collected
-        allcenters.advance(new KMeansMapMessage(i, newCenters))
+        allcenters.advance(m)
       }
     }
 
@@ -222,8 +242,8 @@ object SparkPlusKMeans {
     println("all centers:")
     println(LocalData.centers(0).mkString(","))
     println(LocalData.centers(1).mkString(","))
-    println(LocalData.centers(2).mkString(","))
-    println(LocalData.centers(3).mkString(","))
-    println(LocalData.centers(4).mkString(","))
+    //println(LocalData.centers(2).mkString(","))
+    //println(LocalData.centers(3).mkString(","))
+    //println(LocalData.centers(4).mkString(","))
   }
 }
