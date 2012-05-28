@@ -4,6 +4,8 @@
 *.bak
 *#
 
+words.out*
+
 .idea/
 /build/
 work/
